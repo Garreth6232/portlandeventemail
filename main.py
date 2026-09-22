@@ -21,6 +21,7 @@ from config import load_settings
 from mailer import banners, render
 from mailer.send import build_message, send
 from pipeline import NoSourcesAvailable, build_digest
+import weather
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("digest")
@@ -72,13 +73,17 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 1
 
     prefs = settings.prefs
+    forecast = weather.fetch(prefs.latitude, prefs.longitude, digest.window.today, settings.timezone.key)
+    weather_line = forecast.line if forecast else None
     subject = render.subject(digest, prefs.subject_lines or render.DEFAULT_SUBJECTS, prefs.subject_by_day)
-    text = render.text(digest, settings.from_name)
-    images = banners.available()
+    text = render.text(digest, settings.from_name, weather_line)
+    images = banners.available(forecast.condition if forecast else None)
     log.info("%s (%d listings)", subject, digest.total)
+    if forecast:
+        log.info("Weather: %s [%s, using %s]", forecast.line, forecast.condition, images[0].path.name if images else "no header")
 
     if args.dry_run:
-        preview = render.html(digest, settings.from_name, banners.sources(images, inline=False))
+        preview = render.html(digest, settings.from_name, banners.sources(images, inline=False), weather_line)
         args.output.write_text(preview)
         args.output.with_suffix(".txt").write_text(text)
         log.info("Wrote %s and %s", args.output, args.output.with_suffix(".txt"))
@@ -88,7 +93,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         log.info("Nothing to send today.")
         return 0
 
-    html = render.html(digest, settings.from_name, banners.sources(images, inline=True))
+    html = render.html(digest, settings.from_name, banners.sources(images, inline=True), weather_line)
     recipients = (settings.smtp_user,) if args.only_me else settings.recipients
     messages = [
         build_message(settings.smtp_user, settings.from_name, to, subject, html, text, images)
