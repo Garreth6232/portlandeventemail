@@ -89,10 +89,19 @@ from ticketing sites and start within half an hour of each other.
 5. **Send a test.** Actions > Send digest > Run workflow, with "Send now"
    checked.
 
-After that it sends every weekday at 8. Gmail allows a personal account
-about 500 recipients a day, so four people is nowhere near the limit.
+After that it sends every weekday at 8. To see the email without sending
+it to anyone, run the workflow with "Preview only" checked; the finished
+email is attached to the run as a download called `preview`.
+
+Gmail allows a personal account about 500 recipients a day, so four people
+is nowhere near the limit.
 
 ## Changing what shows up
+
+The subject line rotates through the list under `[subject]` in
+`preferences.toml`, one per day, with set lines for Mondays and Fridays.
+Add, remove or reword them there. `{date}` becomes "Tuesday, Sep 22" and
+`{weekday}` becomes "Tuesday".
 
 Everything about taste lives in `preferences.toml`: category weights,
 keyword boosts ("35mm", "natural wine"), favorite venues, which venues
@@ -112,10 +121,10 @@ make the email, then get sorted by time. The rest are counted in a
 at the bottom. They're attached to each email rather than linked, so they
 work from a private repo and don't need hosting anywhere.
 
-To change one, replace the file with another PNG of the same name. Make it
-1120 pixels wide; it's shown at 560, which keeps it sharp on phones. Any
-height works. Delete a file to go without it. With no header, the email
-falls back to its name in text.
+To change one, replace the file with another PNG of the same name, at
+least 1120 pixels wide. It's shown up to 680 wide on a computer and edge
+to edge on a phone. Any height works. Delete a file to go without it.
+With no header, the email falls back to its name in text.
 
 Some mail apps hide images until you tap "show images", so nothing
 essential should live only in the pictures.
