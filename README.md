@@ -115,6 +115,15 @@ more for each extra source that lists it. The top scorers in each section
 make the email, then get sorted by time. The rest are counted in a
 "Plus 4 more this week" line.
 
+## Weather
+
+A small line under the date gives the day's forecast in three parts, for
+example "Morning 61°, cloudy · Afternoon 69°, partly cloudy · Tonight 63°,
+mostly clear". Afternoon is the high; morning and tonight are averages. A
+rain chance of 30% or more gets mentioned. The forecast comes from
+[Open-Meteo](https://open-meteo.com), which is free and needs no key. If it
+can't be reached, the email goes out without the line.
+
 ## Header and footer images
 
 `assets/header.png` sits at the top of every email and `assets/footer.png`
@@ -125,6 +134,18 @@ To change one, replace the file with another PNG of the same name, at
 least 1120 pixels wide. It's shown up to 680 wide on a computer and edge
 to edge on a phone. Any height works. Delete a file to go without it.
 With no header, the email falls back to its name in text.
+
+The header can change with the weather. Add any of these to `assets/` and
+it's used on days with that weather; anything missing falls back to
+`header.png`:
+
+| File | Used when |
+| --- | --- |
+| `header-sunny.png` | mostly clear skies |
+| `header-cloudy.png` | overcast or foggy, no real rain |
+| `header-rainy.png` | a couple of hours of rain, or a 60%+ chance |
+| `header-snowy.png` | a couple of hours of snow |
+| `header-stormy.png` | any thunder |
 
 Some mail apps hide images until you tap "show images", so nothing
 essential should live only in the pictures.
