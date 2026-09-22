@@ -1,0 +1,173 @@
+import json
+import time
+from datetime import date, datetime, timezone
+
+from helpers import FIXTURES, TODAY, TZ, Window
+from sources import hollywood_theatre, pdx_pipeline, portland_parks, seatgeek, ticketmaster, vine_and_dine
+
+
+# Ticketmaster ----------------------------------------------------------------
+
+TM_EVENT = {
+    "name": "Hozier",
+    "url": "https://www.ticketmaster.com/event/1",
+    "dates": {"start": {"dateTime": "2026-10-04T03:00:00Z"}, "status": {"code": "onsale"}},
+    "_embedded": {"venues": [{"name": "Moda Center"}]},
+    "classifications": [{"segment": {"name": "Music"}}],
+    "priceRanges": [{"min": 65.0, "max": 150.0}],
+}
+
+
+def test_ticketmaster_parse():
+    e = ticketmaster.parse(TM_EVENT)
+    assert e.name == "Hozier"
+    assert e.start == datetime(2026, 10, 4, 3, tzinfo=timezone.utc)
+    assert e.venue == "Moda Center"
+    assert e.category == "Music"
+    assert e.price == "$65 to $150"
+    assert e.ticketed
+
+
+def test_ticketmaster_skips_cancelled_and_tba():
+    cancelled = {**TM_EVENT, "dates": {**TM_EVENT["dates"], "status": {"code": "cancelled"}}}
+    tba = {**TM_EVENT, "dates": {"start": {"localDate": "2026-10-04"}}}
+    assert ticketmaster.parse(cancelled) is None
+    assert ticketmaster.parse(tba) is None
+
+
+def test_ticketmaster_window_is_sent_in_utc():
+    start = Window(TODAY, TZ).start  # midnight Pacific
+    assert ticketmaster._api_time(start) == "2026-09-22T07:00:00Z"
+
+
+# SeatGeek ----------------------------------------------------------------------
+
+SG_EVENT = {
+    "title": "Utah Jazz at Portland Trail Blazers",
+    "url": "https://seatgeek.com/e/1",
+    "datetime_local": "2026-10-08T19:00:00",
+    "venue": {"name": "Moda Center"},
+    "taxonomies": [{"name": "nba"}],
+    "stats": {"lowest_price": 41, "highest_price": 395},
+}
+
+
+def test_seatgeek_parse():
+    e = seatgeek.parse(SG_EVENT, TZ)
+    assert e.start == datetime(2026, 10, 8, 19, tzinfo=TZ)
+    assert e.category == "Sports"
+    assert e.price == "$41 to $395"
+
+
+def test_seatgeek_skips_time_tbd():
+    assert seatgeek.parse({**SG_EVENT, "time_tbd": True}, TZ) is None
+
+
+# Hollywood Theatre -----------------------------------------------------------
+
+def hollywood_events():
+    items = json.loads((FIXTURES / "hollywood_events.json").read_text())
+    return [hollywood_theatre.parse(item, TZ) for item in items]
+
+
+def test_hollywood_reads_showtime_from_title():
+    dance, combat, misty, *_ = hollywood_events()
+    assert dance.name == "Hellavision Television – DANCE EVERYWHERE"
+    assert dance.start == datetime(2026, 10, 24, 19, tzinfo=TZ)
+    assert combat.start == datetime(2026, 10, 6, 19, 30, tzinfo=TZ)
+    assert misty.start == datetime(2026, 10, 19, 19, tzinfo=TZ)
+
+
+def test_hollywood_tidies_all_caps_titles():
+    _, combat, misty, jack, _ = hollywood_events()
+    assert combat.name == "Immortal Combat"
+    assert misty.name == "Misty Green"
+    assert jack.name == "Violence Jack: OVA Collection"
+
+
+def test_hollywood_falls_back_to_slug_and_skips_undated_posts():
+    *_, jack, membership = hollywood_events()
+    assert jack.start == datetime(2026, 9, 27, 21, 30, tzinfo=TZ)
+    assert membership is None
+
+
+# Portland Parks ----------------------------------------------------------------
+
+def parks(only=()):
+    return portland_parks.parse_calendar((FIXTURES / "parks_atlas_sample.ics").read_bytes(), TZ, only)
+
+
+def test_parks_parses_feed():
+    names = {e.name for e in parks()}
+    assert "Movies in the Park: Laurelhurst Park" in names
+    assert len(names) == 4
+
+
+def test_parks_categories_from_titles():
+    by_name = {e.name: e for e in parks()}
+    assert by_name["Movies in the Park: Laurelhurst Park"].category == "Film"
+    assert by_name["Summer Concert Series: Mt. Tabor Park"].category == "Music"
+    assert by_name["Pittock Garden Tuesday Volunteer Day"].category == "Volunteer"
+    assert by_name["Fall Leaf Peeping Walk: Laurelhurst Park"].category == "Parks"
+
+
+def test_parks_all_day_events():
+    walk = next(e for e in parks() if "Leaf Peeping" in e.name)
+    assert walk.start.date() == date(2026, 9, 30)
+    assert walk.when == "All day"
+
+
+def test_parks_filter():
+    kept = parks(["laurelhurst"])
+    assert len(kept) == 2
+    assert all("laurelhurst" in f"{e.name} {e.venue}".lower() for e in kept)
+
+
+# PDX Pipeline ------------------------------------------------------------------
+
+def test_pdx_pipeline_parses_roundup():
+    html = (FIXTURES / "pdxpipeline_sample.html").read_text()
+    events = pdx_pipeline.parse_roundup(html, date(2026, 9, 20), TZ)
+    by_name = {e.name: e for e in events}
+
+    assert len(events) == 4
+    assert by_name["Marc Price"].venue == "Mission Theater"
+    assert by_name["Marc Price"].start == datetime(2026, 9, 21, 19, tzinfo=TZ)
+    assert by_name["Taco Tuesday Extended"].start.hour == 16  # "4-6PM" starts at 4
+    assert by_name["Taco Tuesday Extended"].category == "Happy Hour"
+    assert by_name["Indie Night"].url == "https://www.pdxpipeline.com/some-indie-show"
+
+
+def test_pdx_pipeline_keeps_unparseable_time_text():
+    html = "<h3>Tuesday, September 22:</h3><ul><li><strong>Music:</strong> Band @ Bar | Doors at dusk, fun.</li></ul>"
+    (e,) = pdx_pipeline.parse_roundup(html, TODAY, TZ)
+    assert e.when == "Doors at dusk"
+
+
+def test_pdx_pipeline_ignores_lines_before_a_date():
+    html = "<ul><li><strong>Music:</strong> Band @ Bar | 8PM, no date.</li></ul>"
+    assert pdx_pipeline.parse_roundup(html, TODAY, TZ) == []
+
+
+# PDX Vine and Dine -------------------------------------------------------------
+
+def test_vine_and_dine_weekend_dating():
+    assert vine_and_dine.weekend_friday(date(2026, 9, 22)) == date(2026, 9, 25)  # Tue
+    assert vine_and_dine.weekend_friday(date(2026, 9, 25)) == date(2026, 9, 25)  # Fri
+    assert vine_and_dine.weekend_friday(date(2026, 9, 27)) == date(2026, 9, 25)  # Sun
+
+
+def test_vine_and_dine_parse():
+    entry = {
+        "title": "This Weekend in Wine",
+        "link": "https://pdxvineanddine.substack.com/p/x",
+        "published_parsed": time.strptime("2026-09-24", "%Y-%m-%d"),
+    }
+    e = vine_and_dine.parse(entry, TZ)
+    assert e.start == datetime(2026, 9, 25, 17, tzinfo=TZ)
+    assert e.category == "Food & Drink"
+    assert e.when == "All weekend"
+
+
+def test_vine_and_dine_skips_incomplete_entries():
+    assert vine_and_dine.parse({"title": "No link"}, TZ) is None

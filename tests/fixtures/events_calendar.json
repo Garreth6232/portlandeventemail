@@ -1,0 +1,84 @@
+{
+  "events": [
+    {
+      "id": 1,
+      "title": "Siren: The Voices of Shelley Beattie w/ Marlee Matlin &amp; Irene Taylor Q&amp;A",
+      "url": "https://portlandartmuseum.org/event/siren-the-voices-of-shelley-beattie/",
+      "start_date": "2026-09-22 19:00:00",
+      "all_day": false,
+      "timezone": "America/Los_Angeles",
+      "cost": "Free",
+      "venue": {"venue": "Portland Art Museum", "city": "Portland", "state": "OR"},
+      "categories": [{"name": "PAM CUT @ The Whitsell"}, {"name": "Screenings &amp; experiences"}]
+    },
+    {
+      "id": 2,
+      "title": "Latino Makers Food &#038; Wine Convivio",
+      "url": "https://www.oregonwine.org/event/latino-makers-food-wine-convivio/",
+      "start_date": "2026-09-25 12:00:00",
+      "all_day": false,
+      "timezone": "America/Los_Angeles",
+      "cost": "$50 – $225",
+      "venue": {"venue": "The Preserve", "address": "9301 SW Bayou Dr", "city": "McMinnville", "state": "OR"},
+      "categories": [{"name": "BIPOC In Wine"}, {"name": "Winemaker Dinner"}]
+    },
+    {
+      "id": 3,
+      "title": "World Gorilla Weekend at Silverback Estate Winery",
+      "url": "https://www.oregonwine.org/event/world-gorilla-weekend-at-silverback-estate-winery/",
+      "start_date": "2026-09-24 00:00:00",
+      "all_day": true,
+      "timezone": "America/Los_Angeles",
+      "cost": "Free",
+      "venue": {"venue": "Silverback Estate Winery", "city": "Salem", "state": "OR"},
+      "categories": [{"name": "Fundraiser"}]
+    },
+    {
+      "id": 4,
+      "title": "Craft-Focused Workshop: Personalized Feedback on Work in Progress",
+      "url": "https://literary-arts.org/event/craft-focused-workshop/",
+      "start_date": "2026-09-23 17:30:00",
+      "all_day": false,
+      "timezone": "America/Los_Angeles",
+      "cost": "$480.00",
+      "venue": {"venue": "Literary Arts", "city": "Portland"},
+      "categories": []
+    },
+    {
+      "id": 5,
+      "title": "Portland Arts &amp; Lectures 2026–27: George Saunders",
+      "url": "https://literary-arts.org/event/portland-arts-lectures-2026-27-george-saunders/",
+      "start_date": "2026-09-24 19:30:00",
+      "all_day": false,
+      "timezone": "America/Los_Angeles",
+      "cost": "Subscription required",
+      "venue": {"venue": "Arlene Schnitzer Concert Hall", "city": "Portland"},
+      "categories": []
+    },
+    {
+      "id": 6,
+      "title": "John Nunn",
+      "url": "https://www.portlandfarmersmarket.org/event/john-nunn-3/",
+      "start_date": "2026-09-23 17:00:00",
+      "all_day": false,
+      "timezone": "America/Los_Angeles",
+      "cost": "",
+      "venue": {"venue": "Kenton Farmers Market", "city": "Portland"},
+      "categories": []
+    },
+    {
+      "id": 7,
+      "title": "Kenton Farmers Market",
+      "url": "https://www.portlandfarmersmarket.org/event/kenton-farmers-market-2026/2026-09-23/",
+      "start_date": "2026-09-23 15:00:00",
+      "all_day": false,
+      "timezone": "America/Los_Angeles",
+      "cost": "",
+      "venue": [],
+      "categories": []
+    }
+  ],
+  "rest_url": "https://example.org/wp-json/tribe/events/v1/events/?page=1",
+  "total": 7,
+  "total_pages": 1
+}
