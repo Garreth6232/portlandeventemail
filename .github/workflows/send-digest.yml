@@ -1,0 +1,43 @@
+name: Send digest
+
+on:
+  schedule:
+    # 8am Portland time is 15:00 UTC in summer and 16:00 UTC in winter.
+    # Both run every weekday; main.py only sends from the one that's 8am.
+    - cron: "0 15 * * 1-5"
+    - cron: "0 16 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Send now, whatever the time
+        type: boolean
+        default: false
+
+concurrency:
+  group: send-digest
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Build and send
+        env:
+          TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}
+          SEATGEEK_CLIENT_ID: ${{ secrets.SEATGEEK_CLIENT_ID }}
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          RECIPIENTS: ${{ secrets.RECIPIENTS }}
+          FROM_NAME: ${{ vars.FROM_NAME }}
+          SCHEDULE: ${{ github.event.schedule }}
+        run: python main.py ${{ inputs.force && '--force' || '' }}
