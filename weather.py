@@ -17,6 +17,8 @@ import net
 
 URL = "https://api.open-meteo.com/v1/forecast"
 RAIN_CHANCE_WORTH_MENTIONING = 30  # percent
+WINDY_SUSTAINED_MPH = 18
+WINDY_GUST_MPH = 30
 
 # (label, first hour, last hour, which temperature to show)
 PERIODS = (
@@ -25,8 +27,11 @@ PERIODS = (
     ("Tonight", 18, 22, "average"),
 )
 
-# The day's one-word condition, used to pick assets/header-<condition>.png.
-SUNNY, CLOUDY, RAINY, SNOWY, STORMY = "sunny", "cloudy", "rainy", "snowy", "stormy"
+# The day's one-word condition, which picks the header (see [headers] in
+# preferences.toml). Checked in this order; the first that fits wins.
+STORMY, SNOWY, RAINY, WINDY, CLOUDY, SUNNY, NORMAL = (
+    "stormy", "snowy", "rainy", "windy", "cloudy", "sunny", "normal")
+CONDITIONS = (STORMY, SNOWY, RAINY, WINDY, CLOUDY, SUNNY, NORMAL)
 
 # WMO weather codes, as Open-Meteo reports them.
 _THUNDER = set(range(95, 100))
@@ -45,14 +50,30 @@ log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
+class Hour:
+    temp: float
+    rain: int
+    code: int
+    wind: float
+    gust: float
+
+    @property
+    def windy(self) -> bool:
+        return self.wind >= WINDY_SUSTAINED_MPH or self.gust >= WINDY_GUST_MPH
+
+
+@dataclass(frozen=True)
 class Period:
     label: str
     temp: int
     sky: str
     rain_chance: int
+    windy: bool = False
 
     def __str__(self) -> str:
         text = f"{self.label} {self.temp}°, {self.sky}"
+        if self.windy:
+            text += " and windy"
         wet = any(w in self.sky for w in ("rain", "drizzle", "shower", "snow", "thunder"))
         if self.rain_chance >= RAIN_CHANCE_WORTH_MENTIONING:
             text += f" ({self.rain_chance}%)" if wet else f", {self.rain_chance}% chance of rain"
@@ -75,8 +96,9 @@ def fetch(latitude: float, longitude: float, day: date, timezone: str) -> Option
     params = {
         "latitude": latitude,
         "longitude": longitude,
-        "hourly": "temperature_2m,precipitation_probability,weather_code",
+        "hourly": "temperature_2m,precipitation_probability,weather_code,wind_speed_10m,wind_gusts_10m",
         "temperature_unit": "fahrenheit",
+        "wind_speed_unit": "mph",
         "timezone": timezone,
         "start_date": day.isoformat(),
         "end_date": day.isoformat(),
@@ -90,27 +112,33 @@ def fetch(latitude: float, longitude: float, day: date, timezone: str) -> Option
 
 def parse(data: dict) -> Optional[Forecast]:
     hourly = data.get("hourly") or {}
-    hours = {
-        int(t[11:13]): (temp, rain or 0, code)
-        for t, temp, rain, code in zip(
-            hourly.get("time", []),
-            hourly.get("temperature_2m", []),
-            hourly.get("precipitation_probability", []),
-            hourly.get("weather_code", []),
-        )
-        if temp is not None and code is not None
-    }
+    times = hourly.get("time", [])
+
+    def column(name: str) -> list:
+        values = hourly.get(name) or []
+        return list(values) + [None] * (len(times) - len(values))
+
+    hours: dict[int, Hour] = {}
+    for t, temp, rain, code, wind, gust in zip(
+        times, column("temperature_2m"), column("precipitation_probability"),
+        column("weather_code"), column("wind_speed_10m"), column("wind_gusts_10m"),
+    ):
+        if temp is None or code is None:
+            continue
+        hours[int(t[11:13])] = Hour(temp, rain or 0, code, wind or 0.0, gust or 0.0)
+
     periods = []
     for label, first, last, which in PERIODS:
         rows = [hours[h] for h in range(first, last + 1) if h in hours]
         if not rows:
             continue
-        temps = [r[0] for r in rows]
+        temps = [r.temp for r in rows]
         periods.append(Period(
             label=label,
             temp=round(max(temps) if which == "high" else mean(temps)),
-            sky=_describe([r[2] for r in rows], night=label == "Tonight"),
-            rain_chance=max(r[1] for r in rows),
+            sky=_describe([r.code for r in rows], night=label == "Tonight"),
+            rain_chance=max(r.rain for r in rows),
+            windy=sum(r.windy for r in rows) >= 2,
         ))
     if not periods:
         return None
@@ -121,16 +149,14 @@ def parse(data: dict) -> Optional[Forecast]:
 def _describe(codes: list[int], night: bool) -> str:
     """Wet weather wins if it shows up for at least two hours (thunder for
     one); otherwise the average cloud cover decides."""
-    counts = Counter(codes)
     if any(c in _THUNDER for c in codes):
         return "thunderstorms"
     wet = [c for c in codes if c in _WET_WORDS]
     if len(wet) >= 2:
         return _WET_WORDS[Counter(wet).most_common(1)[0][0]]
-    if sum(counts[c] for c in _FOG) * 2 >= len(codes):
+    if sum(c in _FOG for c in codes) * 2 >= len(codes):
         return "foggy"
-    sky = [c for c in codes if c <= 3] or [3]
-    cover = mean(sky)
+    cover = mean([c for c in codes if c <= 3] or [3])
     if cover < 0.5:
         return "clear" if night else "sunny"
     if cover < 1.5:
@@ -140,15 +166,22 @@ def _describe(codes: list[int], night: bool) -> str:
     return "cloudy"
 
 
-def _condition(rows: list[tuple]) -> str:
-    codes = [r[2] for r in rows]
+def _condition(rows: list[Hour]) -> str:
+    codes = [r.code for r in rows]
     if any(c in _THUNDER for c in codes):
         return STORMY
     if sum(c in _SNOW for c in codes) >= 2:
         return SNOWY
-    if sum(c in _RAIN for c in codes) >= 2 or max((r[1] for r in rows), default=0) >= 60:
+    if sum(c in _RAIN for c in codes) >= 2 or max((r.rain for r in rows), default=0) >= 60:
         return RAINY
+    if sum(r.windy for r in rows) >= 2:
+        return WINDY
+    if sum(c in _FOG for c in codes) * 2 >= len(codes):
+        return CLOUDY
     sky = [c for c in codes if c <= 3]
-    if sky and mean(sky) < 1.5:
+    cover = mean(sky) if sky else 3
+    if cover >= 2.3:
+        return CLOUDY
+    if cover < 1.0:
         return SUNNY
-    return CLOUDY
+    return NORMAL
