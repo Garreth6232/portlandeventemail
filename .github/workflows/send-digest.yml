@@ -16,6 +16,10 @@ on:
         description: Preview only, don't email anyone
         type: boolean
         default: false
+      only_me:
+        description: Send now, but only to my own Gmail
+        type: boolean
+        default: false
 
 concurrency:
   group: send-digest
@@ -44,7 +48,7 @@ jobs:
           RECIPIENTS: ${{ secrets.RECIPIENTS }}
           FROM_NAME: ${{ vars.FROM_NAME }}
           SCHEDULE: ${{ github.event.schedule }}
-        run: python main.py ${{ inputs.force && '--force' || '' }} ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: python main.py ${{ inputs.force && '--force' || '' }} ${{ inputs.dry_run && '--dry-run' || '' }} ${{ inputs.only_me && '--only-me' || '' }}
 
       # A dry run leaves the finished email here as a download on the run's page.
       - if: ${{ inputs.dry_run }}
