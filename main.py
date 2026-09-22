@@ -77,7 +77,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     weather_line = forecast.line if forecast else None
     subject = render.subject(digest, prefs.subject_lines or render.DEFAULT_SUBJECTS, prefs.subject_by_day)
     text = render.text(digest, settings.from_name, weather_line)
-    images = banners.available(forecast.condition if forecast else None)
+    header = banners.header_for(forecast.condition if forecast else None, digest.window.today, prefs.headers)
+    images = banners.available(header)
     log.info("%s (%d listings)", subject, digest.total)
     if forecast:
         log.info("Weather: %s [%s, using %s]", forecast.line, forecast.condition, images[0].path.name if images else "no header")
