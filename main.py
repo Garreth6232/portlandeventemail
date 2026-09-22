@@ -4,6 +4,7 @@
     python main.py --force          send now
     python main.py --dry-run        write preview.html and preview.txt instead of sending
     python main.py --only-me        send now, but only to the Gmail address it sends from
+    python main.py --only-me --weather rainy   ...pretending it's a rainy day, to try a header
     python main.py --dry-run --date 2026-10-02
 """
 from __future__ import annotations
@@ -53,6 +54,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--force", action="store_true", help="send regardless of day and time")
     parser.add_argument("--only-me", action="store_true",
                         help="send now, only to the sending Gmail address (for trying things out)")
+    parser.add_argument("--weather", choices=weather.CONDITIONS,
+                        help="pretend today's weather is this, to try out its header")
     parser.add_argument("--date", type=date.fromisoformat, help="build the digest for this date (YYYY-MM-DD)")
     parser.add_argument("--output", type=Path, default=Path("preview.html"), help="preview path for --dry-run")
     args = parser.parse_args(argv)
@@ -76,12 +79,17 @@ def main(argv: Optional[list[str]] = None) -> int:
     forecast = weather.fetch(prefs.latitude, prefs.longitude, digest.window.today, settings.timezone.key)
     weather_line = forecast.line if forecast else None
     subject = render.subject(digest, prefs.subject_lines or render.DEFAULT_SUBJECTS, prefs.subject_by_day)
+    condition = forecast.condition if forecast else None
+    if args.weather:
+        condition = args.weather
+        subject = f"[Testing the {args.weather} header] {subject}"
     text = render.text(digest, settings.from_name, weather_line)
-    header = banners.header_for(forecast.condition if forecast else None, digest.window.today, prefs.headers)
+    header = banners.header_for(condition, digest.window.today, prefs.headers)
     images = banners.available(header)
     log.info("%s (%d listings)", subject, digest.total)
     if forecast:
-        log.info("Weather: %s [%s, using %s]", forecast.line, forecast.condition, images[0].path.name if images else "no header")
+        log.info("Weather: %s [%s]", forecast.line, forecast.condition)
+    log.info("Header: %s", images[0].path.name if images else "none")
 
     if args.dry_run:
         preview = render.html(digest, settings.from_name, banners.sources(images, inline=False), weather_line)
