@@ -42,27 +42,60 @@ def test_more_dates_wording():
     assert render.more_dates(run) == "Runs through Fri 9/25, 4 showings"
 
 
-def test_subject_leads_with_top_pick(window, prefs):
+def test_subject_rotates_by_day(window, prefs):
+    digest = build([event("Show", category="Film")], window, prefs)
+    lines = ("A {date}", "B {weekday}")
+    assert render.subject(digest, lines, by_day={}) in {"A Tuesday, Sep 22", "B Tuesday"}
+    # Same day, same line, so a re-run doesn't change it.
+    assert render.subject(digest, lines, by_day={}) == render.subject(digest, lines, by_day={})
+
+
+def test_subject_day_override(window, prefs):
+    digest = build([], window, prefs)
+    assert render.subject(digest, ("x",), by_day={"tuesday": "Taco Tuesday, Portland!"}) == "Taco Tuesday, Portland!"
+
+
+def test_preferences_subjects_all_format(prefs):
+    for line in prefs.subject_lines + tuple(prefs.subject_by_day.values()):
+        assert "{" not in line.format(date="Tuesday, Sep 22", weekday="Tuesday")
+
+
+def test_preheader_names_the_best_listings(window, prefs):
     digest = build([event("Natural Wine Night", category="Food & Drink"),
                     event("Trivia", at(9, 22, 20), category="Trivia")], window, prefs)
-    assert render.subject(digest) == "Tue 9/22: Natural Wine Night and 1 more"
+    assert "Today: Natural Wine Night and Trivia" in render.html(digest, "x")
 
 
 def test_empty_digest(window, prefs):
     digest = build([], window, prefs)
     assert "Nothing new on the calendar" in render.html(digest, "Portland Events")
-    assert render.subject(digest) == "Tue 9/22: nothing new"
 
 
-def test_other_category_is_not_shown(window, prefs):
-    out = render.text(build([event("Record Swap", venue="Tomorrow Theater", category="Other")], window, prefs), "x")
-    assert "Tomorrow Theater\n" in out
+def test_labels_colors_and_top_pick(window, prefs):
+    events = [event("Film Night", category="Film", price="Free"),
+              event("Dinner", at(9, 22, 18), category="Food & Drink", price="$20"),
+              event("Trivia", at(9, 22, 20), category="Trivia")]
+    out = render.html(build(events, window, prefs), "x")
+    assert render.CATEGORY_COLORS["Film"] in out
+    assert "Top pick" in out and out.count("Top pick") == 1
+    text = render.text(build(events, window, prefs), "x")
+    assert "Film · Top pick" in text
+
+
+def test_free_is_highlighted():
+    assert render.is_free("Free") and render.is_free("Free ($5 suggested donation)")
+    assert not render.is_free("$20") and not render.is_free(None)
 
 
 def test_venue_is_not_repeated_when_it_matches_the_name(window, prefs):
     market = event("Kenton Farmers Market", venue="Kenton Farmers Market", category="Market")
     out = render.text(build([market], window, prefs), "x")
-    assert "Kenton Farmers Market\nMarket\n" in out
+    assert "Kenton Farmers Market\nhttps://" in out
+
+
+def test_other_category_is_not_shown(window, prefs):
+    out = render.text(build([event("Record Swap", venue="Tomorrow Theater", category="Other")], window, prefs), "x")
+    assert "Tomorrow Theater\n" in out
 
 
 def test_copy_has_no_em_dashes(window, prefs):
