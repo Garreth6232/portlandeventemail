@@ -20,6 +20,11 @@ on:
         description: Send now, but only to my own Gmail
         type: boolean
         default: false
+      pretend_weather:
+        description: Try a header by pretending the weather is...
+        type: choice
+        options: [none, sunny, cloudy, windy, rainy, snowy, stormy, normal]
+        default: none
 
 concurrency:
   group: send-digest
@@ -48,7 +53,7 @@ jobs:
           RECIPIENTS: ${{ secrets.RECIPIENTS }}
           FROM_NAME: ${{ vars.FROM_NAME }}
           SCHEDULE: ${{ github.event.schedule }}
-        run: python main.py ${{ inputs.force && '--force' || '' }} ${{ inputs.dry_run && '--dry-run' || '' }} ${{ inputs.only_me && '--only-me' || '' }}
+        run: python main.py ${{ inputs.force && '--force' || '' }} ${{ inputs.dry_run && '--dry-run' || '' }} ${{ inputs.only_me && '--only-me' || '' }} ${{ inputs.pretend_weather && inputs.pretend_weather != 'none' && format('--weather {0}', inputs.pretend_weather) || '' }}
 
       # A dry run leaves the finished email here as a download on the run's page.
       - if: ${{ inputs.dry_run }}
