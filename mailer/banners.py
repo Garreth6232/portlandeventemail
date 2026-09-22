@@ -5,14 +5,26 @@ they work from a private repo with nothing to host. To change one, replace
 the file in assets/ with another PNG at least 1120 pixels wide (it's shown
 at up to 680, and edge to edge on phones). Delete a file to go without
 that banner.
+
+The header can follow the weather. If assets/ has a file named for the
+day's condition, that one is used instead of header.png:
+
+    header-sunny.png   header-cloudy.png   header-rainy.png
+    header-snowy.png   header-stormy.png
+
+Any that don't exist fall back to header.png.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 ASSETS = Path(__file__).parent.parent / "assets"
 DISPLAY_WIDTH = 680  # the email's width; banners run edge to edge across it
+
+HEADER_ALT = "Fun Things to Do in Portland"
+FOOTER_ALT = "I love you Portland. Have a great day!"
 
 
 @dataclass(frozen=True)
@@ -26,14 +38,15 @@ class Banner:
         return f"{self.name}@portland-events"
 
 
-_DEFAULTS = (
-    Banner("header", ASSETS / "header.png", "Fun Things to Do in Portland"),
-    Banner("footer", ASSETS / "footer.png", "I love you Portland. Have a great day!"),
-)
-
-
-def available() -> list[Banner]:
-    return [b for b in _DEFAULTS if b.path.is_file()]
+def available(condition: Optional[str] = None, assets: Path = ASSETS) -> list[Banner]:
+    header = assets / "header.png"
+    if condition and (assets / f"header-{condition}.png").is_file():
+        header = assets / f"header-{condition}.png"
+    candidates = (
+        Banner("header", header, HEADER_ALT),
+        Banner("footer", assets / "footer.png", FOOTER_ALT),
+    )
+    return [b for b in candidates if b.path.is_file()]
 
 
 def sources(banners: list[Banner], inline: bool) -> dict[str, dict]:
