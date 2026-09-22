@@ -3,6 +3,7 @@
     python main.py                  scheduled run: sends only at 8am Pacific on weekdays
     python main.py --force          send now
     python main.py --dry-run        write preview.html and preview.txt instead of sending
+    python main.py --only-me        send now, but only to the Gmail address it sends from
     python main.py --dry-run --date 2026-10-02
 """
 from __future__ import annotations
@@ -49,6 +50,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Portland events digest")
     parser.add_argument("--dry-run", action="store_true", help="write a preview instead of sending")
     parser.add_argument("--force", action="store_true", help="send regardless of day and time")
+    parser.add_argument("--only-me", action="store_true",
+                        help="send now, only to the sending Gmail address (for trying things out)")
     parser.add_argument("--date", type=date.fromisoformat, help="build the digest for this date (YYYY-MM-DD)")
     parser.add_argument("--output", type=Path, default=Path("preview.html"), help="preview path for --dry-run")
     args = parser.parse_args(argv)
@@ -56,7 +59,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     settings = load_settings(require_email=not args.dry_run)
     now = datetime.now(settings.timezone)
 
-    if not (args.dry_run or args.force):
+    if not (args.dry_run or args.force or args.only_me):
         schedule = os.environ.get("SCHEDULE") or None
         if not should_send(now, settings.timezone, settings.send_hour, schedule):
             log.info("Not the send window (%s). Use --force to send anyway.", now.strftime("%a %H:%M %Z"))
@@ -86,9 +89,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 0
 
     html = render.html(digest, settings.from_name, banners.sources(images, inline=True))
+    recipients = (settings.smtp_user,) if args.only_me else settings.recipients
     messages = [
         build_message(settings.smtp_user, settings.from_name, to, subject, html, text, images)
-        for to in settings.recipients
+        for to in recipients
     ]
     send(settings.smtp_host, settings.smtp_port, settings.smtp_user, settings.smtp_password, messages)
     return 0
