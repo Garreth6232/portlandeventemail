@@ -17,6 +17,18 @@ lines = [
 monday = "New week, Portland! {date}"
 friday = "Happy Friday, Portland! Here's the weekend"
 
+[headers]
+# Which header image goes out for each kind of weather. Files live in assets/.
+# With more than one listed, they take turns day by day. A file that's
+# missing falls back to header.png.
+sunny  = ["header.email.sunny.png", "header.png"]
+normal = ["header.png"]
+cloudy = ["header.email.slightly cloudy.png"]
+windy  = ["header.email.wind.png"]
+rainy  = ["Email.Header.Rainy.png"]
+snowy  = ["header.email.snow.png"]
+stormy = ["Email.Header.Thunder.png"]
+
 [location]
 # Central Portland (Burnside Bridge). Swap in your own neighborhood if you
 # want the radius centered there instead.
