@@ -2,8 +2,9 @@
 
 They're attached to the email itself and referenced by content ID, so
 they work from a private repo with nothing to host. To change one, replace
-the file in assets/ with another PNG, ideally 1120 pixels wide (it's shown
-at 560). Delete a file to go without that banner.
+the file in assets/ with another PNG at least 1120 pixels wide (it's shown
+at up to 680, and edge to edge on phones). Delete a file to go without
+that banner.
 """
 from __future__ import annotations
 
@@ -11,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ASSETS = Path(__file__).parent.parent / "assets"
-DISPLAY_WIDTH = 560
+DISPLAY_WIDTH = 680  # the email's width; banners run edge to edge across it
 
 
 @dataclass(frozen=True)
