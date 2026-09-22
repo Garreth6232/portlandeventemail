@@ -158,11 +158,12 @@ def _preheader(digest: Digest) -> str:
     return f"{lead}, plus {rest} more" if rest else lead
 
 
-def _context(digest: Digest, from_name: str) -> dict:
+def _context(digest: Digest, from_name: str, weather_line: str | None = None) -> dict:
     counts = [f"{len(s.events) + s.overflow} {_OVERFLOW[s.key]}" for s in digest.sections]
     return {
         "from_name": from_name,
         "date_line": long_day(digest.window.today),
+        "weather": weather_line,
         "summary": join(counts),
         "preheader": _preheader(digest),
         "sections": [_section(s) for s in digest.sections],
@@ -180,18 +181,22 @@ def subject(digest: Digest, lines: Sequence[str] = DEFAULT_SUBJECTS,
     return template.format(date=f"{today:%A}, {today:%b} {today.day}", weekday=f"{today:%A}")
 
 
-def html(digest: Digest, from_name: str, banners: dict[str, dict] | None = None) -> str:
+def html(digest: Digest, from_name: str, banners: dict[str, dict] | None = None,
+         weather_line: str | None = None) -> str:
     """`banners` maps "header"/"footer" to {"src", "alt"}; see mailer/banners.py."""
     return _env.get_template("digest.html.j2").render(
-        **_context(digest, from_name),
+        **_context(digest, from_name, weather_line),
         banners=banners or {},
         width=DISPLAY_WIDTH,
     )
 
 
-def text(digest: Digest, from_name: str) -> str:
-    ctx = _context(digest, from_name)
-    lines = [ctx["from_name"], ctx["date_line"], ""]
+def text(digest: Digest, from_name: str, weather_line: str | None = None) -> str:
+    ctx = _context(digest, from_name, weather_line)
+    lines = [ctx["from_name"], ctx["date_line"]]
+    if ctx["weather"]:
+        lines.append(ctx["weather"])
+    lines.append("")
 
     for section in ctx["sections"]:
         lines += [f"{section['title'].upper()}  {section['span']}".rstrip(), ""]
