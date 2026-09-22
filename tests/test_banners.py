@@ -13,7 +13,7 @@ def test_real_send_references_attachments_by_content_id(window, prefs):
     html = render.html(digest, "Portland Events", banners.sources(banners.available(), inline=True))
     assert 'src="cid:header@portland-events"' in html
     assert 'src="cid:footer@portland-events"' in html
-    assert html.index("cid:header") < html.index("Show") < html.index("cid:footer")
+    assert html.index("cid:header") < html.index(">Show</a>") < html.index("cid:footer")
 
 
 def test_preview_points_at_local_files(window, prefs):
