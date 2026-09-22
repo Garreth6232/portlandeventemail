@@ -68,7 +68,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         log.error("%s", exc)
         return 1
 
-    subject = render.subject(digest)
+    prefs = settings.prefs
+    subject = render.subject(digest, prefs.subject_lines or render.DEFAULT_SUBJECTS, prefs.subject_by_day)
     text = render.text(digest, settings.from_name)
     images = banners.available()
     log.info("%s (%d listings)", subject, digest.total)
