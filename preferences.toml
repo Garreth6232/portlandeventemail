@@ -1,0 +1,144 @@
+# What the digest looks for and what it puts first.
+# Edit, commit, and the next morning's email picks it up.
+
+[location]
+# Central Portland (Burnside Bridge). Swap in your own neighborhood if you
+# want the radius centered there instead.
+latitude = 45.5231
+longitude = -122.6680
+radius_miles = 15
+
+[sections]
+# How many listings each section shows before the rest collapse into "Plus N more".
+today = 8
+this_week = 12
+coming_up = 12
+# No more than this many from one category in a section, so each one shows
+# a spread. Leftover seats are filled from whatever's next best.
+max_per_category = 3
+# Arena and big-hall listings allowed per section.
+max_big_venue = 2
+
+[categories]
+# 1.0 is neutral. Anything not listed here counts as 1.0.
+"film" = 1.5
+"food & drink" = 1.4
+"music" = 1.2
+"comedy" = 1.1
+"theater & arts" = 1.1
+"talks & readings" = 1.1
+"festival" = 1.1
+"market" = 1.0
+"parks" = 1.0
+"sports" = 1.0
+"family" = 0.8
+"trivia" = 0.8
+"happy hour" = 0.7
+"other" = 0.7
+"volunteer" = 0.5
+
+[boosts]
+# Added to an event's score when its name or venue contains the word.
+# Only the largest matching boost counts, so they don't stack.
+keywords = { "wine" = 0.5, "winery" = 0.4, "natural wine" = 0.5, "tasting" = 0.3, "pop-up" = 0.3, "35mm" = 0.5, "70mm" = 0.5, "16mm" = 0.4, "double feature" = 0.3, "retrospective" = 0.3, "q&a" = 0.3, "premiere" = 0.2, "screening" = 0.2, "outdoor movie" = 0.3 }
+
+# Venues we like. Anything here gets venue_boost on top of the above.
+favorite_venues = [
+  "Hollywood Theatre",
+  "Tomorrow Theater",
+  "Laurelhurst Theater",
+  "Laurelhurst Park",
+  "Clinton Street Theater",
+  "Cinema 21",
+  "Academy Theater",
+  "5th Avenue Cinema",
+]
+venue_boost = 0.4
+
+[ticketed]
+# Ticketmaster and SeatGeek list nearly everything with a box office, so
+# only these venues get through. Matching is on part of the name.
+
+# Arenas and big halls. At most max_big_venue of these per section.
+big_venues = [
+  "Moda Center",
+  "Veterans Memorial Coliseum",
+  "Providence Park",
+  "Keller Auditorium",
+  "Arlene Schnitzer Concert Hall",
+  "Edgefield",
+]
+
+# Clubs, small theaters and comedy rooms. These rank like anything else.
+small_venues = [
+  "Crystal Ballroom",
+  "Roseland Theater",
+  "Revolution Hall",
+  "Wonder Ballroom",
+  "Aladdin Theater",
+  "Doug Fir Lounge",
+  "Mississippi Studios",
+  "Polaris Hall",
+  "Holocene",
+  "Alberta Rose Theatre",
+  "Hawthorne Theatre",
+  "Star Theater",
+  "Old Church Concert Hall",
+  "Newmark Theatre",
+  "Winningstad Theatre",
+  "Helium Comedy Club",
+  "Mission Theater",
+  "Bagdad Theater",
+  "Kennedy School",
+]
+
+[parks]
+# Limit Portland Parks events to parks whose name contains one of these,
+# e.g. ["laurelhurst", "mt tabor"]. Empty means every park.
+only = []
+
+# Sites running The Events Calendar for WordPress. They all publish the
+# same feed, so adding one is a few lines here. To check a site, open
+# <site>/wp-json/tribe/events/v1/events in a browser; JSON means it works.
+#
+#   category   used when the site's own labels and the title don't say
+#   include    keep only titles containing one of these
+#   exclude    drop titles containing any of these
+#   cities     keep only venues in these cities
+
+[[calendars]]
+name = "Portland Art Museum"
+site = "https://portlandartmuseum.org"
+category = "Theater & Arts"
+
+[[calendars]]
+name = "Literary Arts"
+site = "https://literary-arts.org"
+category = "Talks & Readings"
+exclude = ["workshop", "class", "craft-focused"]
+
+[[calendars]]
+name = "Portland Farmers Market"
+site = "https://www.portlandfarmersmarket.org"
+category = "Market"
+include = ["farmers market"]
+
+[[calendars]]
+name = "Lan Su Chinese Garden"
+site = "https://lansugarden.org"
+category = "Parks"
+exclude = ["koi", "calligraphy demo"]
+
+[[calendars]]
+name = "Pioneer Courthouse Square"
+site = "https://www.thesquarepdx.org"
+category = "Other"
+
+[[calendars]]
+name = "Oregon Wine Board"
+site = "https://www.oregonwine.org"
+category = "Food & Drink"
+# Portland plus the north Willamette Valley, all within about an hour.
+cities = ["Portland", "Beaverton", "Hillsboro", "Tigard", "Lake Oswego", "West Linn",
+          "Oregon City", "Sherwood", "Wilsonville", "Newberg", "Dundee", "Dayton",
+          "Carlton", "Yamhill", "Gaston", "Forest Grove", "McMinnville"]
