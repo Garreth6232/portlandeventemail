@@ -46,6 +46,7 @@
         <tr>
           <td style="padding:18px 0 16px; border-bottom:2px solid {{ ink }}; font-family:{{ sans }};">
             <div style="font-size:17px; line-height:1.3; font-weight:700; color:{{ ink }};">{{ date_line }}</div>
+            {% if weather %}<div style="font-size:13px; line-height:1.45; color:{{ muted }}; padding-top:4px;">{% for part in weather.split(' · ') %}<span style="white-space:nowrap;">{{ part }}</span>{% if not loop.last %} &middot; {% endif %}{% endfor %}</div>{% endif %}
             {% if summary %}<div style="font-size:14px; line-height:1.4; color:{{ muted }}; padding-top:3px;">{{ summary|capitalize }}</div>{% endif %}
           </td>
         </tr>
