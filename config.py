@@ -39,6 +39,7 @@ class Preferences:
     calendars: tuple[Calendar, ...] = ()
     subject_lines: tuple[str, ...] = ()
     subject_by_day: dict[str, str] = field(default_factory=dict)
+    headers: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -88,6 +89,10 @@ def load_preferences(path: Path = PREFERENCES_PATH) -> Preferences:
         subject_by_day={
             day: line for day, line in raw.get("subject", {}).items()
             if day in _WEEKDAYS and isinstance(line, str)
+        },
+        headers={
+            weather.lower(): tuple([files] if isinstance(files, str) else files)
+            for weather, files in raw.get("headers", {}).items()
         },
     )
 
