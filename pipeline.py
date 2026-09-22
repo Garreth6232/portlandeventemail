@@ -13,6 +13,8 @@ from datetime import date, timedelta
 from difflib import SequenceMatcher
 from itertools import groupby
 
+import requests
+
 import ranking
 from config import Preferences, Settings
 from models import Event, Window
@@ -76,7 +78,13 @@ def collect(settings: Settings, window: Window) -> list[Event]:
         for source, future in futures.items():
             try:
                 found = future.result()
+            except requests.RequestException as exc:
+                # The site was down or turned the request away. One line is enough.
+                failures += 1
+                log.warning("%s: couldn't reach it (%s)", source.label, exc)
+                continue
             except Exception:
+                # Anything else is probably a bug worth a full traceback.
                 failures += 1
                 log.exception("%s: fetch failed", source.label)
                 continue
