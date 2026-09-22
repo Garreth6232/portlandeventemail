@@ -1,6 +1,22 @@
 # What the digest looks for and what it puts first.
 # Edit, commit, and the next morning's email picks it up.
 
+[subject]
+# The email's subject line. One is picked per day and they rotate.
+# {date} becomes "Tuesday, Sep 22" and {weekday} becomes "Tuesday".
+lines = [
+  "Good morning, Portland! {date}",
+  "Rise and shine, Portland: {date}",
+  "Morning! Here's Portland for {weekday}",
+  "What's on in Portland, {date}",
+  "Hello, Portland! Your {weekday} lineup",
+  "Portland, {weekday} edition",
+  "Coffee's on. Here's Portland for {date}",
+]
+# A set line for a particular day, used instead of the rotation.
+monday = "New week, Portland! {date}"
+friday = "Happy Friday, Portland! Here's the weekend"
+
 [location]
 # Central Portland (Burnside Bridge). Swap in your own neighborhood if you
 # want the radius centered there instead.
