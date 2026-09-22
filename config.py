@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 from zoneinfo import ZoneInfo
@@ -37,6 +37,8 @@ class Preferences:
     small_venues: tuple[str, ...]
     parks_only: tuple[str, ...]
     calendars: tuple[Calendar, ...] = ()
+    subject_lines: tuple[str, ...] = ()
+    subject_by_day: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -82,7 +84,15 @@ def load_preferences(path: Path = PREFERENCES_PATH) -> Preferences:
         small_venues=tuple(ticketed.get("small_venues", [])),
         parks_only=tuple(p.lower() for p in raw.get("parks", {}).get("only", [])),
         calendars=tuple(_calendar(c) for c in raw.get("calendars", [])),
+        subject_lines=tuple(raw.get("subject", {}).get("lines", [])),
+        subject_by_day={
+            day: line for day, line in raw.get("subject", {}).items()
+            if day in _WEEKDAYS and isinstance(line, str)
+        },
     )
+
+
+_WEEKDAYS = {"monday", "tuesday", "wednesday", "thursday", "friday"}
 
 
 def _calendar(raw: dict) -> Calendar:
