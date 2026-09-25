@@ -38,17 +38,21 @@ def bucket(category: str | None) -> str:
     return category if category in LABELS else OTHER
 
 
-def score(event: Event, prefs: Preferences) -> float:
-    weight = prefs.category_weights.get(bucket(event.category).lower(), DEFAULT_WEIGHT)
-
+def breakdown(event: Event, prefs: Preferences) -> dict[str, float]:
+    """The parts of an event's score, for explaining a ranking."""
     text = f"{event.name} {event.venue}".lower()
-    boost = max((b for kw, b in prefs.keyword_boosts.items() if _word(kw).search(text)), default=0.0)
-
+    matched = [(b, kw) for kw, b in prefs.keyword_boosts.items() if _word(kw).search(text)]
     venue = event.venue.lower()
-    if any(v.lower() in venue for v in prefs.favorite_venues):
-        boost += prefs.venue_boost
+    return {
+        "category": prefs.category_weights.get(bucket(event.category).lower(), DEFAULT_WEIGHT),
+        "keyword": max(matched)[0] if matched else 0.0,
+        "venue": prefs.venue_boost if any(v.lower() in venue for v in prefs.favorite_venues) else 0.0,
+        "sources": CONFIRMATION_BONUS * (len(event.sources) - 1),
+    }
 
-    return weight + boost + CONFIRMATION_BONUS * (len(event.sources) - 1)
+
+def score(event: Event, prefs: Preferences) -> float:
+    return sum(breakdown(event, prefs).values())
 
 
 def _order(prefs: Preferences):
