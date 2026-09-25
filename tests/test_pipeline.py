@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import timezone
 
 import pytest
@@ -116,3 +117,12 @@ def test_assemble_drops_events_outside_window(window, prefs):
 def test_source_labels_follow_what_was_shown(window, prefs):
     digest = assemble([event("Trivia", at(9, 22), source="pdxpipeline")], window, prefs)
     assert digest.source_labels == ["PDX Pipeline"]
+
+
+def test_source_labels_include_the_full_list(window, prefs):
+    prefs = replace(prefs, section_limits={**prefs.section_limits, "today": 1})
+    films = event("Film", at(9, 22, 19), source="hollywood", category="Film")
+    trivia = event("Trivia", at(9, 22, 20), source="pdxpipeline", category="Trivia")
+    digest = assemble([films, trivia], window, prefs)
+    assert [e.name for e in digest.sections[0].rest] == ["Trivia"]
+    assert "PDX Pipeline" in digest.source_labels

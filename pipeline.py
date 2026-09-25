@@ -121,7 +121,7 @@ def assemble(events: list[Event], window: Window, prefs: Preferences) -> Digest:
         start, end = _section_span(key, window)
         sections.append(Section(key, title, start, end, chosen, rest))
 
-    used = {key for s in sections for e in s.events for key in e.sources}
+    used = {key for s in sections for e in s.events + s.rest for key in e.sources}
     labels = [s.label for s in sources if s.key in used]
     return Digest(window, sections, labels)
 
