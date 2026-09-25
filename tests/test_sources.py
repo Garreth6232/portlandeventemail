@@ -187,7 +187,7 @@ def test_pdx_pipeline_looks_on_the_second_feed_page(monkeypatch):
         None: _feed("https://www.pdxpipeline.com/2026/09/25/a-post/"),
         2: _feed("https://www.pdxpipeline.com/week/", "https://www.pdxpipeline.com/older/"),
     }
-    asked = []
+    asked, slept = [], []
 
     class Resp:
         def __init__(self, content):
@@ -199,10 +199,21 @@ def test_pdx_pipeline_looks_on_the_second_feed_page(monkeypatch):
         return Resp(pages[page])
 
     monkeypatch.setattr(pdx_pipeline.net, "get", fake_get)
+    monkeypatch.setattr(pdx_pipeline.time, "sleep", slept.append)
     monkeypatch.setattr(pdx_pipeline, "parse_roundup", lambda html, today, tz: ["found"])
     window = Window(TODAY, TZ)
     assert pdx_pipeline.fetch(None, window) == ["found"]
     assert asked == [None, 2]
+    assert slept == [pdx_pipeline.CRAWL_DELAY]  # their robots.txt asks for it
+
+
+def test_pdx_pipeline_reads_the_weekend_roundup_too():
+    feed = _feed("https://www.pdxpipeline.com/weekend/",
+                 "https://www.pdxpipeline.com/portland-in-the-news-september-24-2026/",
+                 "https://www.pdxpipeline.com/week/",
+                 "https://www.pdxpipeline.com/weekend-brunch-guide-2026/")
+    links = [e.link for e in pdx_pipeline.find_roundups(feed)]
+    assert links == ["https://www.pdxpipeline.com/weekend/", "https://www.pdxpipeline.com/week/"]
 
 
 def _movie_day(theaters=()):

@@ -1,23 +1,27 @@
 """PDX Pipeline's weekly roundup: trivia, happy hours, small shows, and the
 long tail of bar and neighborhood events nobody sells tickets for.
 
-There's no API. The roundup is the "/week/" item in their RSS feed, written
-as day headers followed by list items like:
+There's no API. The roundups are items in their RSS feed: "/week/" for
+the weekdays and "/weekend/" for Friday through Sunday. By Friday the
+weekday one has usually dropped off the feed and only the weekend one is
+left. Both are written as day headers followed by list items like:
 
     <h3>Portland Monday Events, September 21:</h3>
     <li><strong>Comedy:</strong> Marc Price @ Mission Theater | 7PM, ...</li>
 
 Lines that don't fit that shape are skipped. tests/fixtures/pdxpipeline_sample.html
 holds a copy of the format; if the test against it fails, they've changed it.
-The roundup only covers the current week, so this source never reaches
-"Coming Up".
+The roundups only cover the current week, so this source never reaches
+"Coming Up". Their robots.txt asks for ten seconds between requests.
 """
 from __future__ import annotations
 
 import logging
 import re
+import time
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Optional
+from urllib.parse import urlparse
 
 import feedparser
 from bs4 import BeautifulSoup
@@ -32,9 +36,11 @@ if TYPE_CHECKING:
 KEY = "pdxpipeline"
 FEED_URL = "https://www.pdxpipeline.com/feed/"
 WEEK_URL = "https://www.pdxpipeline.com/week/"
-# By Thursday or Friday the week's other posts can push the roundup off the
-# feed's first page, so look one page further back.
+ROUNDUP_PATHS = ("/week", "/weekend")
+# Other posts can push the roundups off the feed's first page, so look one
+# page further back when there's none there.
 FEED_PAGES = 2
+CRAWL_DELAY = 10  # seconds, from their robots.txt
 
 _MONTHS = {m: i for i, m in enumerate(
     ["january", "february", "march", "april", "may", "june", "july",
@@ -55,20 +61,26 @@ log = logging.getLogger(__name__)
 
 def fetch(settings: Settings, window: Window) -> list[Event]:
     for page in range(1, FEED_PAGES + 1):
+        if page > 1:
+            time.sleep(CRAWL_DELAY)
         params = {"paged": page} if page > 1 else None
-        roundup = find_roundup(net.get(FEED_URL, params=params).content)
-        if roundup is not None:
-            content = roundup.content[0].value if roundup.get("content") else roundup.get("summary", "")
-            return parse_roundup(content, window.today, window.tz)
+        roundups = find_roundups(net.get(FEED_URL, params=params).content)
+        if roundups:
+            events = []
+            for roundup in roundups:
+                content = roundup.content[0].value if roundup.get("content") else roundup.get("summary", "")
+                events.extend(parse_roundup(content, window.today, window.tz))
+            return events
 
-    log.warning("PDX Pipeline: no weekly roundup in the feed")
+    log.warning("PDX Pipeline: no weekly or weekend roundup in the feed")
     return []
 
 
-def find_roundup(feed_xml: bytes):
-    """The weekly roundup entry in one page of the feed, if it's there."""
+def find_roundups(feed_xml: bytes) -> list:
+    """The weekday and weekend roundup entries in one page of the feed."""
     feed = feedparser.parse(feed_xml)
-    return next((e for e in feed.entries if "/week/" in e.get("link", "")), None)
+    return [e for e in feed.entries
+            if urlparse(e.get("link", "")).path.rstrip("/") in ROUNDUP_PATHS]
 
 
 def parse_roundup(html: str, today: date, tz) -> list[Event]:
