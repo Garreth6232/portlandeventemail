@@ -116,16 +116,34 @@ Add, remove or reword them there. `{date}` becomes "Tuesday, Sep 22" and
 Everything about taste lives in `preferences.toml`: category weights,
 keyword boosts ("35mm", "natural wine"), favorite venues, which venues
 Ticketmaster and SeatGeek can list from, the calendar sites, section sizes
-(8 today, 12 this week, 12 coming up), how many per category, and where
+(8 today, 12 this week, 12 coming up), how many per category and venue,
+the top pick rotation, and where
 the search is centered. Edit it, push, and the next email reflects it.
 
 How an event's score works: its category weight, plus the largest keyword
 boost it matches, plus a bump if the venue is a favorite, plus a little
-more for each extra source that lists it. A category a source made up
-("Karaoke", "Workshop") keeps its label in the email but ranks as
-"other". On a tie, a one-time event beats one that repeats weekly, then
-the sooner one wins. The top scorers in each section make the email, then
-get sorted by time.
+more for each extra source that lists it, minus a penalty if it has five
+or more dates in the next month. Film and music sit at a neutral weight,
+because there's always a lot of both; the special ones (a 35mm print, a
+Q&A, a live score, a one-night show) rise through the keyword boosts, and
+a film's regular run or a weekly trivia night sinks under the long-run
+penalty. A category a source made up ("Karaoke", "Workshop") keeps its
+label in the email but ranks as "other". On a tie, a one-time event beats
+one that repeats, then the sooner one wins.
+
+Each section holds at most two listings per category and two per venue,
+and one arena show, before filling any leftover seats with the next best.
+
+The "Top pick" takes turns by category: one step a day through the list
+under `[top_pick]`, with each section starting at a different point, so
+the three picks in an email differ and tomorrow's differ from today's.
+It's the best listing shown in that day's category, or the next category
+down the list if the section has none.
+
+Preview runs (Actions > Send digest > "Preview only") log each section's
+choices with their scores broken down, and how many candidates each
+category had, which is the quickest way to see what a change to
+`preferences.toml` does.
 
 The rest aren't dropped. "Plus 23 more this week" links to a plain
 one-line-each list at the bottom of the email, grouped by day. Gmail hides

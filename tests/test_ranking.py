@@ -66,7 +66,7 @@ def test_big_venue_cap(prefs):
 
 
 def test_category_cap_spreads_a_section(prefs):
-    prefs = replace(prefs, max_per_category=2)
+    prefs = replace(prefs, max_per_category=2, max_per_venue=0)
     films = [event(f"Film {i}", category="Film") for i in range(6)]
     others = [event("Tasting", category="Food & Drink"), event("Show", category="Music"),
               event("Market", category="Market")]
@@ -100,3 +100,60 @@ def test_tea_tasting_is_not_a_wine_event():
     from categories import FOOD_DRINK, PARKS, infer
     assert infer("Autumn Tea Tasting", default=PARKS) == PARKS
     assert infer("Willamette Valley Wine Tasting", default=PARKS) == FOOD_DRINK
+
+
+def test_venue_cap_spreads_a_section(prefs):
+    prefs = replace(prefs, max_per_category=10, max_per_venue=2, favorite_venues=("Clinton",))
+    clinton = [event(f"Night {i}", venue="Clinton Street Theater", category="Theater & Arts") for i in range(4)]
+    elsewhere = [event("Reading", venue="Powell's", category="Talks & Readings"),
+                 event("Market", venue="PSU", category="Market")]
+    chosen, _ = pick(clinton + elsewhere, limit=4, prefs=prefs)
+    assert sum(e.venue == "Clinton Street Theater" for e in chosen) == 2
+
+
+def test_long_runs_rank_below_one_offs(prefs):
+    prefs = replace(prefs, long_run=5, long_run_penalty=0.5, favorite_venues=())
+    run = event("Regular Run", category="Film")
+    run.other_dates = [at(9, 23), at(9, 24), at(9, 25), at(9, 26)]
+    once = event("One Night", category="Film")
+    assert score(run, prefs) == pytest.approx(score(once, prefs) - 0.5)
+    short = event("Short Run", category="Film")
+    short.other_dates = [at(9, 23), at(9, 24), at(9, 25)]  # four dates: not long
+    assert score(short, prefs) == score(once, prefs)
+
+
+def test_specialty_screening_beats_an_ordinary_one(prefs):
+    fav = prefs.favorite_venues[0]
+    ordinary = event("Practical Magic 2", venue=fav, category="Film")
+    ordinary.other_dates = [at(9, 23 + i) for i in range(6)]
+    special = event("Batman in 70mm", venue=fav, category="Film")
+    tasting = event("Natural Wine Night", category="Food & Drink")
+    # A 70mm print at a favorite theater stands level with a wine night; a
+    # regular run at the same theater falls well below both.
+    assert score(special, prefs) >= score(tasting, prefs) > score(ordinary, prefs) + 0.5
+
+
+def test_top_pick_rotates_by_day_and_section():
+    from datetime import date, timedelta
+    from ranking import top_pick
+    rotation = ("Food & Drink", "Music", "Film")
+    chosen = [event("Film", category="Film"), event("Show", category="Music"),
+              event("Dinner", category="Food & Drink")]
+    day = date(2026, 9, 21)
+    while day.toordinal() % 3:
+        day += timedelta(days=1)
+    picks = [top_pick(chosen, day + timedelta(days=d), 0, rotation).name for d in range(3)]
+    assert picks == ["Dinner", "Show", "Film"]
+    # Each section starts one step further on, so an email's picks differ.
+    assert [top_pick(chosen, day, s, rotation).name for s in range(3)] == ["Dinner", "Show", "Film"]
+
+
+def test_top_pick_falls_through_to_the_next_category():
+    from datetime import date
+    from ranking import top_pick
+    chosen = [event("Film", category="Film"), event("Talk", category="Talks & Readings"),
+              event("Trivia", category="Trivia")]
+    day = date.fromordinal(3 * 739000)  # rotation index 0
+    assert top_pick(chosen, day, 0, ("Food & Drink", "Music", "Talks & Readings")).name == "Talk"
+    assert top_pick(chosen, day, 0, ("Comedy",)).name == "Film"  # nothing matches: the best one
+    assert top_pick(chosen[:2], day, 0, ("Film",)) is None  # too few to call one a pick

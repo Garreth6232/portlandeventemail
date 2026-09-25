@@ -45,6 +45,10 @@ class Preferences:
     subject_by_day: dict[str, str] = field(default_factory=dict)
     headers: dict[str, tuple[str, ...]] = field(default_factory=dict)
     movie_theaters: tuple[str, ...] = ()
+    top_pick_rotation: tuple[str, ...] = ()
+    max_per_venue: int = 0            # 0 means no limit
+    long_run: int = 0                 # 0 means no penalty
+    long_run_penalty: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -101,6 +105,10 @@ def load_preferences(path: Path = PREFERENCES_PATH) -> Preferences:
             for weather, files in raw.get("headers", {}).items()
         },
         movie_theaters=tuple(raw.get("movie_times", {}).get("theaters", [])),
+        max_per_venue=int(sections.get("max_per_venue", 0)),
+        long_run=int(boosts.get("long_run", 0)),
+        long_run_penalty=float(boosts.get("long_run_penalty", 0.0)),
+        top_pick_rotation=tuple(canonical(c) or OTHER for c in raw.get("top_pick", {}).get("rotation", [])),
     )
 
 
