@@ -22,6 +22,7 @@ It runs on GitHub Actions, so there's no server to keep alive.
 | --- | --- | --- |
 | Hollywood Theatre | Every screening, from the theater's own site | No |
 | Portland Art Museum | Exhibitions, talks, and PAM CUT screenings at the Tomorrow Theater | No |
+| Clinton Street Theater | Cult, indie and repertory film, plus drag, music and comedy nights | No |
 | Literary Arts | Readings, author talks, Portland Arts & Lectures | No |
 | PDX Pipeline | The weekly roundup: bars, trivia, happy hours, small shows | No |
 | PDX Vine and Dine | The weekly wine tasting roundup, as one listing | No |
@@ -33,7 +34,7 @@ It runs on GitHub Actions, so there's no server to keep alive.
 | Ticketmaster | Shows at the venues listed in `preferences.toml` | Free |
 | SeatGeek | The same, and a cross-check on Ticketmaster | Free |
 
-The middle six all run the same WordPress calendar plugin, so they share one
+The middle seven all run the same WordPress calendar plugin, so they share one
 connector (`sources/events_calendar.py`) and are listed under `[[calendars]]`
 in `preferences.toml`. Adding another site that uses it is four lines there.
 

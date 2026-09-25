@@ -140,6 +140,13 @@ site = "https://portlandartmuseum.org"
 category = "Theater & Arts"
 
 [[calendars]]
+name = "Clinton Street Theater"
+site = "https://cstpdx.com"
+# Mostly film, plus drag, music and comedy nights; those get their own
+# category from the theater's labels or the title.
+category = "Film"
+
+[[calendars]]
 name = "Literary Arts"
 site = "https://literary-arts.org"
 category = "Talks & Readings"
