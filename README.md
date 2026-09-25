@@ -25,7 +25,7 @@ It runs on GitHub Actions, so there's no server to keep alive.
 | Portland Art Museum | Exhibitions, talks, and PAM CUT screenings at the Tomorrow Theater | No |
 | Clinton Street Theater | Cult, indie and repertory film, plus drag, music and comedy nights | No |
 | Literary Arts | Readings, author talks, Portland Arts & Lectures | No |
-| PDX Pipeline | The weekly roundup: bars, trivia, happy hours, small shows | No |
+| PDX Pipeline | The weekday and weekend roundups: bars, trivia, happy hours, small shows | No |
 | PDX Vine and Dine | The weekly wine tasting roundup, as one listing | No |
 | Oregon Wine Board | Tastings and winemaker dinners in Portland and the north Willamette Valley | No |
 | Portland Farmers Market | Every market day across the city | No |
