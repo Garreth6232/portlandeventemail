@@ -39,7 +39,11 @@ class Section:
     start: date
     end: date
     events: list[Event]  # chosen, best first
-    overflow: int
+    rest: list[Event]    # the ones that didn't make it, by date
+
+    @property
+    def overflow(self) -> int:
+        return len(self.rest)
 
 
 @dataclass
@@ -113,9 +117,9 @@ def assemble(events: list[Event], window: Window, prefs: Preferences) -> Digest:
         members = [e for e in events if window.section_for(e.start) == key]
         if not members:
             continue
-        chosen, overflow = ranking.pick(members, prefs.section_limits[key], prefs)
+        chosen, rest = ranking.pick(members, prefs.section_limits[key], prefs)
         start, end = _section_span(key, window)
-        sections.append(Section(key, title, start, end, chosen, overflow))
+        sections.append(Section(key, title, start, end, chosen, rest))
 
     used = {key for s in sections for e in s.events for key in e.sources}
     labels = [s.label for s in sources if s.key in used]

@@ -101,3 +101,33 @@ def test_other_category_is_not_shown(window, prefs):
 def test_copy_has_no_em_dashes(window, prefs):
     out = render.html(build([event("Show", category="Film")], window, prefs), "Portland Events")
     assert "—" not in out and "&mdash;" not in out
+
+
+def _crowded_week(n):
+    return [event(f"Trivia {i}", at(9, 23 + i % 5, 18 + i % 4), category="Trivia", venue=f"Bar {i}")
+            for i in range(n)]
+
+
+def test_leftovers_are_listed_at_the_bottom(window, prefs):
+    digest = build(_crowded_week(20), window, prefs)
+    week = next(s for s in digest.sections if s.key == "week")
+    out = render.html(digest, "x")
+    assert 'href="#more-week"' in out and 'id="more-week"' in out
+    assert f"Plus {week.overflow} more this week, listed at the bottom." in out
+    for e in week.rest:
+        assert e.name in out
+    assert "ALSO THIS WEEK" in render.text(digest, "x")
+
+
+def test_full_list_is_trimmed_to_stay_under_gmails_clip(window, prefs, monkeypatch):
+    digest = build(_crowded_week(60), window, prefs)
+    full = render.html(digest, "x")
+    monkeypatch.setattr(render, "HTML_BUDGET", len(full.encode()) - 2000)
+    trimmed = render.html(digest, "x")
+    assert len(trimmed.encode()) <= render.HTML_BUDGET
+    assert "more." in trimmed and "And " in trimmed
+
+
+def test_no_full_list_when_everything_fits(window, prefs):
+    out = render.html(build([event("Film", category="Film")], window, prefs), "x")
+    assert "The full list" not in out

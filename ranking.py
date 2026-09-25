@@ -2,7 +2,10 @@
 
 An event's score is its category weight, plus the largest keyword boost it
 matches, plus a boost for favorite venues, plus a little for every extra
-source that lists it.
+source that lists it. A category label a source made up ("Karaoke",
+"Workshop") counts as Other, for its weight and for the per-category cap.
+On equal scores, a one-time event beats one that repeats, then the sooner
+one wins.
 
 Picking happens in two passes. The first takes the best scorers while
 holding each category to max_per_category, so a section shows a spread
@@ -17,6 +20,7 @@ import re
 from collections import Counter
 from functools import lru_cache
 
+from categories import LABELS, OTHER
 from config import Preferences
 from models import Event
 
@@ -29,8 +33,13 @@ def _word(keyword: str) -> re.Pattern:
     return re.compile(r"(?<![a-z0-9])" + re.escape(keyword) + r"(?![a-z0-9])")
 
 
+def bucket(category: str | None) -> str:
+    """The category an event ranks under."""
+    return category if category in LABELS else OTHER
+
+
 def score(event: Event, prefs: Preferences) -> float:
-    weight = prefs.category_weights.get((event.category or "").lower(), DEFAULT_WEIGHT)
+    weight = prefs.category_weights.get(bucket(event.category).lower(), DEFAULT_WEIGHT)
 
     text = f"{event.name} {event.venue}".lower()
     boost = max((b for kw, b in prefs.keyword_boosts.items() if _word(kw).search(text)), default=0.0)
@@ -42,9 +51,13 @@ def score(event: Event, prefs: Preferences) -> float:
     return weight + boost + CONFIRMATION_BONUS * (len(event.sources) - 1)
 
 
-def pick(events: list[Event], limit: int, prefs: Preferences) -> tuple[list[Event], int]:
-    """Returns (chosen events in score order, number left out)."""
-    ranked = sorted(events, key=lambda e: (-score(e, prefs), e.start))
+def _order(prefs: Preferences):
+    return lambda e: (-score(e, prefs), bool(e.other_dates), e.start)
+
+
+def pick(events: list[Event], limit: int, prefs: Preferences) -> tuple[list[Event], list[Event]]:
+    """Returns (chosen events in score order, the rest in date order)."""
+    ranked = sorted(events, key=_order(prefs))
     chosen: list[Event] = []
     taken: set[int] = set()
     per_category: Counter[str] = Counter()
@@ -58,7 +71,7 @@ def pick(events: list[Event], limit: int, prefs: Preferences) -> tuple[list[Even
                 continue
             if event.big_venue and big == prefs.max_big:
                 continue
-            category = event.category or ""
+            category = bucket(event.category)
             if varied and per_category[category] == prefs.max_per_category:
                 continue
             chosen.append(event)
@@ -66,5 +79,6 @@ def pick(events: list[Event], limit: int, prefs: Preferences) -> tuple[list[Even
             per_category[category] += 1
             big += event.big_venue
 
-    chosen.sort(key=lambda e: (-score(e, prefs), e.start))
-    return chosen, len(events) - len(chosen)
+    chosen.sort(key=_order(prefs))
+    rest = sorted((e for e in events if id(e) not in taken), key=lambda e: e.start)
+    return chosen, rest
