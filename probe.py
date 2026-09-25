@@ -148,10 +148,14 @@ def describe_page(resp: requests.Response, feed: bool) -> str:
         counts = {t: types.count(t) for t in dict.fromkeys(types)}
         notes.append("schema.org " + ", ".join(f"{n} {t}" for t, n in counts.items()))
     soup = BeautifulSoup(html, "html.parser")
-    if soup.find("link", type="application/rss+xml"):
-        notes.append("RSS link")
-    if any(".ics" in a["href"] or "ical" in a["href"].lower() for a in soup.find_all("a", href=True)):
-        notes.append("iCal link")
+    base = resp.url
+    rss = [urljoin(base, link["href"]) for link in soup.find_all("link", type="application/rss+xml", href=True)]
+    if rss:
+        notes.append("RSS " + " ".join(rss[:3]))
+    ical = list(dict.fromkeys(urljoin(base, a["href"]) for a in soup.find_all("a", href=True)
+                              if ".ics" in a["href"] or "ical" in a["href"].lower()))
+    if ical:
+        notes.append("iCal " + " ".join(ical[:3]))
     ticketing = sorted({host for a in soup.find_all("a", href=True)
                         if (host := urlparse(a["href"]).netloc)
                         and any(t in host for t in ("etix", "ticketmaster", "axs", "dice.fm", "eventbrite",
