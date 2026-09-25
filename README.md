@@ -89,7 +89,7 @@ from ticketing sites and start within half an hour of each other.
 5. **Send a test.** Actions > Send digest > Run workflow, with "Send now"
    checked.
 
-After that it sends every weekday at 8. To see the email without sending
+After that it sends every weekday around 8am. To see the email without sending
 it to anyone, run the workflow with "Preview only" checked; the finished
 email is attached to the run as a download called `preview`.
 
@@ -174,11 +174,23 @@ A dry run doesn't need the Gmail settings.
 
 ## Scheduling
 
-GitHub's cron runs in UTC and doesn't follow daylight saving, so the
-workflow fires at both 15:00 and 16:00 UTC. `main.py` checks which of the
-two lines up with 8am Portland time that day and only that one sends. The
-check uses the scheduled time, not the clock, so a run GitHub starts 40
-minutes late still goes out.
+GitHub starts scheduled jobs late, often by three or four hours, and runs
+set for the top of the hour are the worst hit. A single 8am run therefore
+tends to arrive around lunchtime. So the workflow tries every half hour
+from about 3am to noon Pacific, at :07 and :37 past the hour, and
+`main.py` sends from the first run that starts between 7:45am and noon on
+a weekday. Once that run sends, it leaves a marker in the Actions cache
+for the day, and every later run that day sees it and stops. If GitHub's delay
+holds steady through the morning, the email lands between 7:45 and 8:15, and the retries cover GitHub skipping
+a run.
+
+Change the window with `SEND_FROM` and `SEND_UNTIL` in `config.py`.
+
+Each check that doesn't send still costs a billed minute on a private
+repo, about 20 a weekday or 450 a month. The free plan includes 2,000.
+
+A manual run with "Send now" also marks the day as sent, so the morning
+runs won't send it again. "Only me" and "Preview only" don't.
 
 If every source fails, the job exits with an error instead of sending an
 empty email, and GitHub emails you about the failed run.

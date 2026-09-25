@@ -1,39 +1,68 @@
-from datetime import datetime, timezone
+from datetime import datetime, time, timezone
 
-from config import TIMEZONE
+import pytest
+
+import main
+from config import SEND_FROM, SEND_UNTIL, TIMEZONE
 from main import should_send
-
-SUMMER = "0 15 * * 1-5"
-WINTER = "0 16 * * 1-5"
 
 
 def utc(y, m, d, h, minute=0):
     return datetime(y, m, d, h, minute, tzinfo=timezone.utc)
 
 
-def test_summer_sends_from_the_15_utc_run_only():
+def sends(moment):
+    return should_send(moment, TIMEZONE, SEND_FROM, SEND_UNTIL)
+
+
+def test_window_opens_at_7_45_in_summer():
     tuesday = (2026, 9, 22)
-    assert should_send(utc(*tuesday, 15), TIMEZONE, 8, SUMMER)
-    assert not should_send(utc(*tuesday, 16), TIMEZONE, 8, WINTER)
+    assert not sends(utc(*tuesday, 14, 44))  # 7:44am PDT
+    assert sends(utc(*tuesday, 14, 45))      # 7:45am PDT
+    assert sends(utc(*tuesday, 15, 7))       # 8:07am PDT
 
 
-def test_winter_sends_from_the_16_utc_run_only():
+def test_window_opens_at_7_45_in_winter():
     tuesday = (2026, 12, 1)
-    assert should_send(utc(*tuesday, 16), TIMEZONE, 8, WINTER)
-    assert not should_send(utc(*tuesday, 15), TIMEZONE, 8, SUMMER)
+    assert not sends(utc(*tuesday, 15, 37))  # 7:37am PST
+    assert sends(utc(*tuesday, 16, 7))       # 8:07am PST
 
 
-def test_late_start_still_sends():
-    # GitHub picked up the 15:00 run at 16:40 UTC (9:40am PDT).
-    assert should_send(utc(2026, 9, 22, 16, 40), TIMEZONE, 8, SUMMER)
+def test_late_run_still_sends_before_noon():
+    # GitHub picked up a run at 11:42am PDT.
+    assert sends(utc(2026, 9, 22, 18, 42))
+
+
+def test_nothing_after_noon():
+    assert not sends(utc(2026, 9, 22, 19, 0))    # noon PDT
+    assert not sends(utc(2026, 12, 1, 20, 7))    # 12:07pm PST
 
 
 def test_weekends_never_send():
-    saturday = utc(2026, 9, 26, 15)
-    assert not should_send(saturday, TIMEZONE, 8, SUMMER)
-    assert not should_send(saturday, TIMEZONE, 8, None)
+    assert not sends(utc(2026, 9, 26, 15))  # Saturday 8am PDT
+    assert not sends(utc(2026, 9, 27, 15))  # Sunday
 
 
-def test_without_a_schedule_uses_the_wall_clock():
-    assert should_send(utc(2026, 9, 22, 15, 5), TIMEZONE, 8, None)   # 8:05am PDT
-    assert not should_send(utc(2026, 9, 22, 17), TIMEZONE, 8, None)  # 10am PDT
+def test_every_scheduled_run_falls_on_the_same_pacific_weekday():
+    # The cron runs 10:07 to 19:37 UTC, Monday to Friday. All of those are
+    # the same weekday in Portland, winter or summer.
+    for day in ((2026, 9, 21), (2026, 12, 7)):
+        for hour in (10, 19):
+            moment = utc(*day, hour, 37)
+            assert moment.astimezone(TIMEZONE).weekday() == moment.weekday()
+
+
+def test_already_sent_skips_before_building(monkeypatch):
+    monkeypatch.setenv("ALREADY_SENT", "true")
+    monkeypatch.setenv("GMAIL_ADDRESS", "me@gmail.com")
+    monkeypatch.setenv("GMAIL_APP_PASSWORD", "x")
+    monkeypatch.setenv("RECIPIENTS", "a@x.com")
+    monkeypatch.setattr(main, "build_digest", lambda *a: pytest.fail("should not build"))
+    assert main.main([]) == 0
+
+
+def test_mark_sent_writes_the_step_output(monkeypatch, tmp_path):
+    out = tmp_path / "out"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(out))
+    main._mark_sent()
+    assert out.read_text() == "sent=true\n"

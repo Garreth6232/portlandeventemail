@@ -2,10 +2,12 @@ name: Send digest
 
 on:
   schedule:
-    # 8am Portland time is 15:00 UTC in summer and 16:00 UTC in winter.
-    # Both run every weekday; main.py only sends from the one that's 8am.
-    - cron: "0 15 * * 1-5"
-    - cron: "0 16 * * 1-5"
+    # GitHub starts scheduled runs late, often 3 to 4 hours late, and worst
+    # on the hour. So this tries every half hour from 2 or 3am Pacific to noon,
+    # off the hour. main.py sends from the first run that starts at 7:45am
+    # or later, and the cache check below makes every later run that day
+    # skip. Times are UTC and cover both daylight and standard time.
+    - cron: "7,37 10-19 * * 1-5"
   workflow_dispatch:
     inputs:
       force:
@@ -35,9 +37,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - name: Today's date in Portland
+        id: day
+        run: echo "date=$(TZ=America/Los_Angeles date +%F)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-python@v5
+      # Present once a run has sent today's email to the full list.
+      - name: Check whether today's email already went out
+        id: sent
+        uses: actions/cache/restore@v5
+        with:
+          path: .digest-sent
+          key: digest-sent-${{ steps.day.outputs.date }}
+          lookup-only: true
+
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -45,6 +60,7 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: Build and send
+        id: send
         env:
           TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}
           SEATGEEK_CLIENT_ID: ${{ secrets.SEATGEEK_CLIENT_ID }}
@@ -52,12 +68,22 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           RECIPIENTS: ${{ secrets.RECIPIENTS }}
           FROM_NAME: ${{ vars.FROM_NAME }}
-          SCHEDULE: ${{ github.event.schedule }}
+          ALREADY_SENT: ${{ steps.sent.outputs.cache-hit }}
         run: python main.py ${{ inputs.force && '--force' || '' }} ${{ inputs.dry_run && '--dry-run' || '' }} ${{ inputs.only_me && '--only-me' || '' }} ${{ inputs.pretend_weather && inputs.pretend_weather != 'none' && format('--weather {0}', inputs.pretend_weather) || '' }}
+
+      - name: Remember that today's email went out
+        if: ${{ steps.send.outputs.sent == 'true' }}
+        run: mkdir -p .digest-sent && touch .digest-sent/${{ steps.day.outputs.date }}
+
+      - if: ${{ steps.send.outputs.sent == 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: .digest-sent
+          key: digest-sent-${{ steps.day.outputs.date }}
 
       # A dry run leaves the finished email here as a download on the run's page.
       - if: ${{ inputs.dry_run }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: preview
           path: |

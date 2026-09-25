@@ -171,3 +171,34 @@ def test_vine_and_dine_parse():
 
 def test_vine_and_dine_skips_incomplete_entries():
     assert vine_and_dine.parse({"title": "No link"}, TZ) is None
+
+
+def _feed(*links):
+    items = "".join(
+        f"<item><title>t</title><link>{link}</link><description><![CDATA[x]]></description></item>"
+        for link in links
+    )
+    return f'<?xml version="1.0"?><rss version="2.0"><channel>{items}</channel></rss>'.encode()
+
+
+def test_pdx_pipeline_looks_on_the_second_feed_page(monkeypatch):
+    pages = {
+        None: _feed("https://www.pdxpipeline.com/2026/09/25/a-post/"),
+        2: _feed("https://www.pdxpipeline.com/week/", "https://www.pdxpipeline.com/older/"),
+    }
+    asked = []
+
+    class Resp:
+        def __init__(self, content):
+            self.content = content
+
+    def fake_get(url, params=None):
+        page = (params or {}).get("paged")
+        asked.append(page)
+        return Resp(pages[page])
+
+    monkeypatch.setattr(pdx_pipeline.net, "get", fake_get)
+    monkeypatch.setattr(pdx_pipeline, "parse_roundup", lambda html, today, tz: ["found"])
+    window = Window(TODAY, TZ)
+    assert pdx_pipeline.fetch(None, window) == ["found"]
+    assert asked == [None, 2]

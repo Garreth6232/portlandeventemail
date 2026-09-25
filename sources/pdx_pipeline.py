@@ -32,6 +32,9 @@ if TYPE_CHECKING:
 KEY = "pdxpipeline"
 FEED_URL = "https://www.pdxpipeline.com/feed/"
 WEEK_URL = "https://www.pdxpipeline.com/week/"
+# By Thursday or Friday the week's other posts can push the roundup off the
+# feed's first page, so look one page further back.
+FEED_PAGES = 2
 
 _MONTHS = {m: i for i, m in enumerate(
     ["january", "february", "march", "april", "may", "june", "july",
@@ -51,14 +54,21 @@ log = logging.getLogger(__name__)
 
 
 def fetch(settings: Settings, window: Window) -> list[Event]:
-    feed = feedparser.parse(net.get(FEED_URL).content)
-    roundup = next((e for e in feed.entries if "/week/" in e.get("link", "")), None)
-    if roundup is None:
-        log.warning("PDX Pipeline: no weekly roundup in the feed")
-        return []
+    for page in range(1, FEED_PAGES + 1):
+        params = {"paged": page} if page > 1 else None
+        roundup = find_roundup(net.get(FEED_URL, params=params).content)
+        if roundup is not None:
+            content = roundup.content[0].value if roundup.get("content") else roundup.get("summary", "")
+            return parse_roundup(content, window.today, window.tz)
 
-    content = roundup.content[0].value if roundup.get("content") else roundup.get("summary", "")
-    return parse_roundup(content, window.today, window.tz)
+    log.warning("PDX Pipeline: no weekly roundup in the feed")
+    return []
+
+
+def find_roundup(feed_xml: bytes):
+    """The weekly roundup entry in one page of the feed, if it's there."""
+    feed = feedparser.parse(feed_xml)
+    return next((e for e in feed.entries if "/week/" in e.get("link", "")), None)
 
 
 def parse_roundup(html: str, today: date, tz) -> list[Event]:
