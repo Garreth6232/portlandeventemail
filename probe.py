@@ -201,26 +201,35 @@ def probe(candidate: Candidate) -> list[Result]:
     return results
 
 
-def sample(url: str, lines: int = 120) -> None:
-    """Print a page's visible text, one element per line, to see how a
-    site lays out its listings before writing a reader for it."""
+def sample(url: str, lines: int = 250) -> None:
+    """Print what a page holds, to see how a site lays out its listings
+    before writing a reader for it: embedded data scripts, then the
+    visible text, one element per line. Non-HTML is printed as is."""
     resp = session().get(url, timeout=TIMEOUT)
-    print(f"## {url} ({resp.status_code})")
+    print(f"## {url} ({resp.status_code}, {resp.headers.get('Content-Type', '')})")
+    if "html" not in resp.headers.get("Content-Type", ""):
+        print("\n".join(resp.text.splitlines()[:lines]))
+        return
     soup = BeautifulSoup(resp.text, "html.parser")
-    for tag in soup(["script", "style", "noscript", "svg"]):
+    for script in soup.find_all("script"):
+        body = script.string or ""
+        if script.get("src") or len(body) < 200:
+            continue
+        label = script.get("type") or script.get("id") or "script"
+        print(f"[{label}, {len(body)} chars] {body[:300]!r}")
+    for tag in soup(["script", "style", "noscript", "svg", "head"]):
         tag.decompose()
-    body = soup.find("main") or soup.body or soup
     shown = 0
-    for el in body.find_all(True):
-        if el.find(True) is not None:
-            continue  # leaf elements only
-        text = el.get_text(" ", strip=True)
-        if text:
-            classes = ".".join(el.get("class", []))
-            print(f"{el.name}{'.' + classes if classes else ''}: {text[:100]}")
-            shown += 1
-            if shown >= lines:
-                break
+    for el in soup.find_all(True):
+        own = "".join(el.find_all(string=True, recursive=False)).strip()
+        if not own:
+            continue
+        classes = ".".join(el.get("class", []))
+        href = f" -> {el['href']}" if el.name == "a" and el.get("href") else ""
+        print(f"{el.name}{'.' + classes if classes else ''}: {own[:90]}{href[:80]}")
+        shown += 1
+        if shown >= lines:
+            break
 
 
 def main() -> int:
