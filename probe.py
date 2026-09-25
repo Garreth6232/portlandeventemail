@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -29,6 +30,8 @@ import net
 from sources.events_calendar import PATH as EVENTS_CALENDAR_PATH
 
 TIMEOUT = 15
+# A calendar file or subscription link, not just a word containing "ical".
+_ICAL = re.compile(r"\.ics\b|[?&]ical=|^webcal:", re.IGNORECASE)
 BOT_NAME = "PortlandEventsDigest"
 PARALLEL = 8
 
@@ -75,6 +78,14 @@ CANDIDATES = (
     Candidate("Doug Fir Lounge", "https://www.dougfirlounge.com"),
     # Roundups and wine
     Candidate("EverOut Portland", "https://everout.com", ("/portland/events/",)),
+    *(Candidate(f"{name} feed", site, ("/feed/",), feed=True) for name, site in (
+        ("Mississippi Studios", "https://mississippistudios.com"),
+        ("Revolution Hall", "https://www.revolutionhall.com"),
+        ("Aladdin Theater", "https://www.aladdin-theater.com"),
+        ("Holocene", "https://www.holocene.org"),
+        ("Wonder Ballroom", "https://wonderballroom.com"),
+        ("Clinton Street Theater", "https://cstpdx.com"),
+    )),
     Candidate("Portland Mercury feed", "https://www.portlandmercury.com", ("/feed/",), feed=True),
     Candidate("PDX Vine and Dine feed", "https://pdxvineanddine.substack.com", ("/feed",), feed=True),
     Candidate("Oregon Wine Board", "https://www.oregonwine.org", ("/",)),
@@ -136,6 +147,9 @@ def describe_page(resp: requests.Response, feed: bool) -> str:
             data = resp.json()
         except ValueError:
             return "JSON that doesn't parse"
+        if isinstance(data, dict) and isinstance(data.get("events"), list):
+            titles = "; ".join(str(e.get("title", ""))[:40] for e in data["events"][:3])
+            return f"Events Calendar JSON, {data.get('total', len(data['events']))} events: {titles}"
         return f"JSON, {len(data)} items" if isinstance(data, list) else "JSON"
     if feed or "xml" in kind or "rss" in kind:
         entries = feedparser.parse(resp.content).entries
@@ -153,7 +167,7 @@ def describe_page(resp: requests.Response, feed: bool) -> str:
     if rss:
         notes.append("RSS " + " ".join(rss[:3]))
     ical = list(dict.fromkeys(urljoin(base, a["href"]) for a in soup.find_all("a", href=True)
-                              if ".ics" in a["href"] or "ical" in a["href"].lower()))
+                              if _ICAL.search(a["href"])))
     if ical:
         notes.append("iCal " + " ".join(ical[:3]))
     ticketing = sorted({host for a in soup.find_all("a", href=True)
@@ -187,7 +201,33 @@ def probe(candidate: Candidate) -> list[Result]:
     return results
 
 
+def sample(url: str, lines: int = 120) -> None:
+    """Print a page's visible text, one element per line, to see how a
+    site lays out its listings before writing a reader for it."""
+    resp = session().get(url, timeout=TIMEOUT)
+    print(f"## {url} ({resp.status_code})")
+    soup = BeautifulSoup(resp.text, "html.parser")
+    for tag in soup(["script", "style", "noscript", "svg"]):
+        tag.decompose()
+    body = soup.find("main") or soup.body or soup
+    shown = 0
+    for el in body.find_all(True):
+        if el.find(True) is not None:
+            continue  # leaf elements only
+        text = el.get_text(" ", strip=True)
+        if text:
+            classes = ".".join(el.get("class", []))
+            print(f"{el.name}{'.' + classes if classes else ''}: {text[:100]}")
+            shown += 1
+            if shown >= lines:
+                break
+
+
 def main() -> int:
+    if len(sys.argv) > 1:
+        for url in sys.argv[1:]:
+            sample(url)
+        return 0
     with ThreadPoolExecutor(max_workers=PARALLEL) as pool:
         rows = [r for results in pool.map(probe, CANDIDATES) for r in results]
     table = ["| Source | URL | Status | What's there |", "| --- | --- | --- | --- |"]

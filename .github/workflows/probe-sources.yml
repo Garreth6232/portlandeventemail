@@ -2,9 +2,15 @@ name: Probe sources
 
 # Run by hand from the Actions tab. Checks candidate event sources from
 # GitHub's servers, where the digest runs, and writes a table to the run's
-# summary page. Sends nothing.
+# summary page. Sends nothing. Give it URLs to print those pages' text
+# instead, to see how a site lays out its listings.
 on:
   workflow_dispatch:
+    inputs:
+      sample:
+        description: Space-separated URLs to print as text (leave empty for the full probe)
+        type: string
+        default: ""
 
 jobs:
   probe:
@@ -20,4 +26,6 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - run: python probe.py
+      - run: python probe.py $SAMPLE
+        env:
+          SAMPLE: ${{ inputs.sample }}
