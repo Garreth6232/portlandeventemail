@@ -44,6 +44,7 @@ class Preferences:
     subject_lines: tuple[str, ...] = ()
     subject_by_day: dict[str, str] = field(default_factory=dict)
     headers: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    movie_theaters: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -99,6 +100,7 @@ def load_preferences(path: Path = PREFERENCES_PATH) -> Preferences:
             weather.lower(): tuple([files] if isinstance(files, str) else files)
             for weather, files in raw.get("headers", {}).items()
         },
+        movie_theaters=tuple(raw.get("movie_times", {}).get("theaters", [])),
     )
 
 

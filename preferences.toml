@@ -120,6 +120,21 @@ small_venues = [
   "Kennedy School",
 ]
 
+[movie_times]
+# Theaters to take showtimes for from PDX Movie Times. Matching is on part
+# of the name, as the site writes it. Others it lists include Studio One,
+# Moreland, Bagdad, Kennedy School and St. Johns, mostly first-run.
+theaters = [
+  "Hollywood Theatre",
+  "Laurelhurst Theater",
+  "Cinema 21",
+  "Academy Theater",
+  "Clinton Street Theater",
+  "5th Avenue Cinema",
+  "Tomorrow Theater",
+  "Living Room Theaters",
+]
+
 [parks]
 # Limit Portland Parks events to parks whose name contains one of these,
 # e.g. ["laurelhurst", "mt tabor"]. Empty means every park.

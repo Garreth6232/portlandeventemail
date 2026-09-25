@@ -20,7 +20,8 @@ It runs on GitHub Actions, so there's no server to keep alive.
 
 | Source | What it covers | Key needed |
 | --- | --- | --- |
-| Hollywood Theatre | Every screening, from the theater's own site | No |
+| PDX Movie Times | Showtimes at Hollywood, Laurelhurst, Cinema 21, Academy, Living Room and other indie theaters | No |
+| Hollywood Theatre | Every screening, from the theater's own site (currently refuses GitHub's servers; PDX Movie Times covers it) | No |
 | Portland Art Museum | Exhibitions, talks, and PAM CUT screenings at the Tomorrow Theater | No |
 | Clinton Street Theater | Cult, indie and repertory film, plus drag, music and comedy nights | No |
 | Literary Arts | Readings, author talks, Portland Arts & Lectures | No |
@@ -34,9 +35,17 @@ It runs on GitHub Actions, so there's no server to keep alive.
 | Ticketmaster | Shows at the venues listed in `preferences.toml` | Free |
 | SeatGeek | The same, and a cross-check on Ticketmaster | Free |
 
-The middle seven all run the same WordPress calendar plugin, so they share one
-connector (`sources/events_calendar.py`) and are listed under `[[calendars]]`
-in `preferences.toml`. Adding another site that uses it is four lines there.
+The art museum, Clinton Street, Literary Arts, the Wine Board, the
+Farmers Market, Lan Su and Pioneer Courthouse Square all run the same
+WordPress calendar plugin, so they share one connector
+(`sources/events_calendar.py`) and are listed under `[[calendars]]` in
+`preferences.toml`. Adding another site that uses it is four lines there.
+
+PDX Movie Times gathers every indie theater's showtimes into one page a
+day. Only the theaters under `[movie_times]` in `preferences.toml` are
+kept, which leaves out first-run houses like Studio One and Kennedy School.
+Each film shows up once, at its next showing, with the rest of its run
+noted.
 
 Ticketmaster and SeatGeek list almost everything with a box office, so only
 the venues under `[ticketed]` get through. `big_venues` (Moda Center,
@@ -220,11 +229,15 @@ and a failure in one doesn't affect the others.
 
 ## Known gaps
 
-- **Other indie theaters.** Laurelhurst Theater, Cinema 21, Academy and
-  Clinton Street don't publish showtimes in a form that can be read
-  reliably. Hollywood Theatre and the Tomorrow Theater (through the art
-  museum) do. Favorite-venue boosts still apply when PDX Pipeline mentions
-  one of the others.
+- **Hollywood Theatre, PDX Vine and Dine, Oregon Wine Board.** All three
+  refuse requests from GitHub's servers. Hollywood's showtimes still come
+  in through PDX Movie Times; the two wine sources don't. Running the job
+  from somewhere other than GitHub (a home machine, a small server) would
+  bring them back.
+- **Small music rooms.** Mississippi Studios, Revolution Hall, Polaris
+  Hall, the Aladdin and Holocene sell through Etix, which has no public
+  feed, and their own sites don't publish their calendars in a readable
+  form. Ones that also list on Ticketmaster or SeatGeek show up there.
 - **Checked and left out.** Multnomah County Library (its calendar needs an
   API key it doesn't hand out), Travel Portland and EverOut (no feed),
   Portland'5 (no feed, but its halls are on Ticketmaster and in the venue
