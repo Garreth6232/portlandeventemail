@@ -86,6 +86,7 @@ CANDIDATES = (
         ("Wonder Ballroom", "https://wonderballroom.com"),
         ("Clinton Street Theater", "https://cstpdx.com"),
     )),
+    Candidate("PDX Pipeline feed", "https://www.pdxpipeline.com", ("/feed/", "/feed/?paged=2"), feed=True),
     Candidate("Portland Mercury feed", "https://www.portlandmercury.com", ("/feed/",), feed=True),
     Candidate("PDX Vine and Dine feed", "https://pdxvineanddine.substack.com", ("/feed",), feed=True),
     Candidate("Oregon Wine Board", "https://www.oregonwine.org", ("/",)),
@@ -153,7 +154,8 @@ def describe_page(resp: requests.Response, feed: bool) -> str:
         return f"JSON, {len(data)} items" if isinstance(data, list) else "JSON"
     if feed or "xml" in kind or "rss" in kind:
         entries = feedparser.parse(resp.content).entries
-        return f"feed, {len(entries)} entries: " + "; ".join(e.get("title", "")[:40] for e in entries[:3])
+        listed = "; ".join(f"{e.get('title', '')[:50]} <{e.get('link', '')}>" for e in entries[:12])
+        return f"feed, {len(entries)} entries: {listed}"
 
     html = resp.text
     notes = []
