@@ -157,3 +157,16 @@ def test_top_pick_falls_through_to_the_next_category():
     assert top_pick(chosen, day, 0, ("Food & Drink", "Music", "Talks & Readings")).name == "Talk"
     assert top_pick(chosen, day, 0, ("Comedy",)).name == "Film"  # nothing matches: the best one
     assert top_pick(chosen[:2], day, 0, ("Film",)) is None  # too few to call one a pick
+
+
+def test_top_pick_skips_categories_earlier_sections_used():
+    from datetime import date
+    from ranking import top_pick
+    chosen = [event("Film", category="Film"), event("Talk", category="Talks & Readings"),
+              event("Trivia", category="Trivia")]
+    day = date.fromordinal(3 * 739000)
+    rotation = ("Talks & Readings", "Film")
+    assert top_pick(chosen, day, 0, rotation).name == "Talk"
+    assert top_pick(chosen, day, 0, rotation, taken={"Talks & Readings"}).name == "Film"
+    # If every candidate category is taken, a repeat beats no pick at all.
+    assert top_pick(chosen, day, 0, rotation, taken={"Talks & Readings", "Film"}).name == "Talk"

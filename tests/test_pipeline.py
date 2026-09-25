@@ -126,3 +126,15 @@ def test_source_labels_include_the_full_list(window, prefs):
     digest = assemble([films, trivia], window, prefs)
     assert [e.name for e in digest.sections[0].rest] == ["Trivia"]
     assert "PDX Pipeline" in digest.source_labels
+
+
+def test_an_emails_top_picks_come_from_different_categories(window, prefs):
+    # Same two categories in every section: each section still gets its own.
+    events = [event(f"{c} {d}", at(9, d, 19), f"Venue {c} {d}", category=c)
+              for d in (22, 25, 10 + 30) if d <= 30
+              for c in ("Film", "Talks & Readings", "Music")]
+    events += [event(f"{c} Oct", at(10, 8, 19), f"Venue {c} Oct", category=c)
+               for c in ("Film", "Talks & Readings", "Music")]
+    digest = assemble(events, window, prefs)
+    picks = [s.pick.category for s in digest.sections if s.pick]
+    assert len(picks) == 3 and len(set(picks)) == 3

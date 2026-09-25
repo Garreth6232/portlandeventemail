@@ -22,7 +22,7 @@ import re
 from collections import Counter
 from datetime import date
 from functools import lru_cache
-from typing import Sequence
+from typing import Collection, Sequence
 
 from categories import LABELS, OTHER
 from config import Preferences
@@ -104,19 +104,22 @@ def pick(events: list[Event], limit: int, prefs: Preferences) -> tuple[list[Even
     return chosen, rest
 
 
-def top_pick(chosen: list[Event], day: date, offset: int, rotation: Sequence[str]) -> Event | None:
+def top_pick(chosen: list[Event], day: date, offset: int, rotation: Sequence[str],
+             taken: Collection[str] = ()) -> Event | None:
     """The section's top pick, taking turns by category.
 
     Each day the rotation moves one category along, and each section starts
     `offset` further on, so one email's picks differ and tomorrow's differ
     from today's. The pick is the best listing shown in that category; if
     the section has none, the next category in the rotation is tried.
-    `chosen` is best first, as pick() returns it."""
+    Categories in `taken` (earlier sections' picks) are skipped unless
+    nothing else fits. `chosen` is best first, as pick() returns it."""
     if len(chosen) < MIN_FOR_PICK:
         return None
     if rotation:
         start = (day.toordinal() + offset) % len(rotation)
-        for category in rotation[start:] + rotation[:start]:
+        order = rotation[start:] + rotation[:start]
+        for category in [c for c in order if c not in taken] + [c for c in order if c in taken]:
             match = next((e for e in chosen if bucket(e.category) == category), None)
             if match:
                 return match

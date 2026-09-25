@@ -6,6 +6,7 @@ https://parks.portlandciviclab.org/events/calendar.ics
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime
 from typing import TYPE_CHECKING, Iterable, Optional
 
@@ -32,6 +33,9 @@ _KEYWORDS = (
     (("market", "bazaar"), MARKET),
     (("festival", "fair"), FESTIVAL),
 )
+
+# City business listed on the parks calendar, not something to go to.
+_MEETINGS = re.compile(r"\b(meeting|committee|advisory|hearing|board of)\b", re.IGNORECASE)
 
 log = logging.getLogger(__name__)
 
@@ -63,7 +67,7 @@ def parse_calendar(content: bytes, tz, only: Iterable[str] = ()) -> list[Event]:
 def _parse(component, tz) -> Optional[Event]:
     summary = str(component.get("summary") or "").strip()
     dtstart = component.get("dtstart")
-    if not summary or dtstart is None:
+    if not summary or dtstart is None or _MEETINGS.search(summary):
         return None
 
     raw = dtstart.dt

@@ -327,3 +327,19 @@ def test_pdx_movie_times_showtimes_fold_into_one_listing(window, prefs):
     digest = assemble(events, window, prefs)
     (coyote,) = [e for s in digest.sections for e in s.events + s.rest]
     assert len(coyote.other_dates) == 5
+
+
+def test_parks_skips_city_meetings():
+    ics = b"""BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+SUMMARY:2025 Parks Levy Oversight Committee (PLOC) Meeting
+DTSTART:20260930T180000
+END:VEVENT
+BEGIN:VEVENT
+SUMMARY:Movie in the Park: Coco
+DTSTART:20260930T193000
+END:VEVENT
+END:VCALENDAR
+"""
+    assert [e.name for e in portland_parks.parse_calendar(ics, TZ)] == ["Movie in the Park: Coco"]
