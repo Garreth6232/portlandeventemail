@@ -61,7 +61,8 @@ def log_ranking(digest: Digest, prefs) -> None:
             parts = ranking.breakdown(e, prefs)
             detail = " + ".join(f"{k} {v:.1f}" for k, v in parts.items() if v)
             runs = f", {len(e.other_dates) + 1} dates" if e.other_dates else ""
-            log.info("  %.1f  %-14s %s @ %s (%s%s)", sum(parts.values()), ranking.bucket(e.category),
+            star = "*" if e is s.pick else " "
+            log.info(" %s%.1f  %-14s %s @ %s (%s%s)", star, sum(parts.values()), ranking.bucket(e.category),
                      e.name[:50], e.venue[:30], detail, runs)
 
 
