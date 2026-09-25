@@ -1,6 +1,6 @@
 """Build and send the Portland events digest.
 
-    python main.py                  scheduled run: sends only at 8am Pacific on weekdays
+    python main.py                  scheduled run: sends on weekday mornings, once a day
     python main.py --force          send now
     python main.py --dry-run        write preview.html and preview.txt instead of sending
     python main.py --only-me        send now, but only to the Gmail address it sends from
@@ -13,7 +13,7 @@ import argparse
 import logging
 import os
 import sys
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time
 from pathlib import Path
 from typing import Optional
 from zoneinfo import ZoneInfo
@@ -28,24 +28,23 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 log = logging.getLogger("digest")
 
 
-def should_send(now: datetime, tz: ZoneInfo, send_hour: int, schedule: Optional[str] = None) -> bool:
-    """Whether a run at `now` should send.
+def should_send(now: datetime, tz: ZoneInfo, send_from: time, send_until: time) -> bool:
+    """Whether a scheduled run at `now` falls in the weekday send window.
 
-    GitHub Actions cron is UTC-only, so the workflow fires at both 15:00
-    and 16:00 UTC: 8am in summer and 8am in winter. `schedule` is the cron
-    string that fired this run. The check is whether that cron's UTC hour
-    is 8am Portland time today, which holds even when GitHub starts the job
-    late, as it often does on busy mornings. Without a schedule (a local
-    run), fall back to the wall clock.
+    GitHub starts scheduled jobs late, often by hours on busy mornings, so
+    the workflow tries every half hour and this decides by the actual
+    clock. The workflow separately skips runs once the day's email is out.
     """
     local = now.astimezone(tz)
-    if local.weekday() >= 5:
-        return False
-    if schedule:
-        scheduled_hour = int(schedule.split()[1])
-        target = datetime.combine(local.date(), time(send_hour), tz).astimezone(timezone.utc)
-        return target.hour == scheduled_hour
-    return local.hour == send_hour
+    return local.weekday() < 5 and send_from <= local.time() < send_until
+
+
+def _mark_sent() -> None:
+    """Tell the workflow today's email went out, so later runs skip."""
+    output = os.environ.get("GITHUB_OUTPUT")
+    if output:
+        with open(output, "a") as f:
+            f.write("sent=true\n")
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -64,8 +63,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     now = datetime.now(settings.timezone)
 
     if not (args.dry_run or args.force or args.only_me):
-        schedule = os.environ.get("SCHEDULE") or None
-        if not should_send(now, settings.timezone, settings.send_hour, schedule):
+        if os.environ.get("ALREADY_SENT") == "true":
+            log.info("Today's email already went out.")
+            return 0
+        if not should_send(now, settings.timezone, settings.send_from, settings.send_until):
             log.info("Not the send window (%s). Use --force to send anyway.", now.strftime("%a %H:%M %Z"))
             return 0
 
@@ -109,6 +110,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         for to in recipients
     ]
     send(settings.smtp_host, settings.smtp_port, settings.smtp_user, settings.smtp_password, messages)
+    if not args.only_me:
+        _mark_sent()
     return 0
 
 

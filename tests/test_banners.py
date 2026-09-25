@@ -1,3 +1,7 @@
+import smtplib
+
+import pytest
+
 from helpers import event
 from mailer import banners, render
 from mailer.send import build_message, send
@@ -67,10 +71,45 @@ def test_send_logs_in_and_sends_each_message(monkeypatch):
 
     monkeypatch.setattr("mailer.send.smtplib.SMTP_SSL", FakeSMTP)
     msgs = [build_message("me@gmail.com", "x", to, "s", "<p>h</p>", "t") for to in ("a@x.com", "b@x.com")]
-    send("smtp.gmail.com", 465, "me@gmail.com", "abcd efgh ijkl mnop", msgs)
+    assert send("smtp.gmail.com", 465, "me@gmail.com", "abcd efgh ijkl mnop", msgs) == 2
     assert calls == [
         ("connect", "smtp.gmail.com", 465),
         ("login", "me@gmail.com", "abcdefghijklmnop"),
         ("send", "a@x.com"),
         ("send", "b@x.com"),
     ]
+
+
+class RefusingSMTP:
+    refuse: set = set()
+
+    def __init__(self, *a, **kw):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def login(self, user, password):
+        pass
+
+    def send_message(self, msg):
+        if msg["To"] in self.refuse:
+            raise smtplib.SMTPRecipientsRefused({msg["To"]: (550, b"no such user")})
+
+
+def test_one_refused_address_doesnt_stop_the_rest(monkeypatch):
+    monkeypatch.setattr(RefusingSMTP, "refuse", {"typo@x.com"})
+    monkeypatch.setattr("mailer.send.smtplib.SMTP_SSL", RefusingSMTP)
+    msgs = [build_message("me@gmail.com", "x", to, "s", "<p>h</p>", "t") for to in ("typo@x.com", "b@x.com")]
+    assert send("smtp.gmail.com", 465, "me@gmail.com", "pw", msgs) == 1
+
+
+def test_every_address_refused_is_an_error(monkeypatch):
+    monkeypatch.setattr(RefusingSMTP, "refuse", {"a@x.com"})
+    monkeypatch.setattr("mailer.send.smtplib.SMTP_SSL", RefusingSMTP)
+    msgs = [build_message("me@gmail.com", "x", "a@x.com", "s", "<p>h</p>", "t")]
+    with pytest.raises(RuntimeError):
+        send("smtp.gmail.com", 465, "me@gmail.com", "pw", msgs)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import tomllib
 from dataclasses import dataclass, field
+from datetime import time
 from pathlib import Path
 from typing import Optional
 from zoneinfo import ZoneInfo
@@ -18,7 +19,10 @@ load_dotenv()
 
 PREFERENCES_PATH = Path(__file__).parent / "preferences.toml"
 TIMEZONE = ZoneInfo("America/Los_Angeles")
-SEND_HOUR = 8
+# The scheduled job tries every half hour through the morning and sends from
+# the first run that lands in this window. See "Scheduling" in the README.
+SEND_FROM = time(7, 45)
+SEND_UNTIL = time(12, 0)
 
 
 @dataclass(frozen=True)
@@ -54,7 +58,8 @@ class Settings:
     from_name: str
     recipients: tuple[str, ...]
     timezone: ZoneInfo = TIMEZONE
-    send_hour: int = SEND_HOUR
+    send_from: time = SEND_FROM
+    send_until: time = SEND_UNTIL
 
 
 def load_preferences(path: Path = PREFERENCES_PATH) -> Preferences:
