@@ -170,3 +170,34 @@ def test_top_pick_skips_categories_earlier_sections_used():
     assert top_pick(chosen, day, 0, rotation, taken={"Talks & Readings"}).name == "Film"
     # If every candidate category is taken, a repeat beats no pick at all.
     assert top_pick(chosen, day, 0, rotation, taken={"Talks & Readings", "Film"}).name == "Talk"
+
+
+def test_today_ranks_evening_above_daytime(prefs):
+    from datetime import time
+    prefs = replace(prefs, today_evening_from=time(17), today_daytime_penalty=0.5, favorite_venues=())
+    lunch = event("Lunch Talk", at(9, 22, 12), category="Talks & Readings")
+    tonight = event("Evening Talk", at(9, 22, 19), category="Talks & Readings")
+    all_day = event("Plant Sale", at(9, 22, 10), category="Parks", when="All day")
+    at_five = event("Happy Hour", at(9, 22, 17), category="Talks & Readings")
+    assert score(lunch, prefs, "today") == pytest.approx(score(tonight, prefs, "today") - 0.5)
+    assert score(at_five, prefs, "today") == score(tonight, prefs, "today")  # 5pm counts as evening
+    assert score(all_day, prefs, "today") < score(all_day, prefs)
+    # Only Today: a daytime event later in the week isn't marked down.
+    assert score(lunch, prefs, "week") == score(tonight, prefs, "week")
+    chosen, rest = pick([lunch, tonight], limit=1, prefs=prefs, section="today")
+    assert chosen == [tonight] and rest == [lunch]
+
+
+def test_daytime_still_fills_a_quiet_evening(prefs):
+    from datetime import time
+    prefs = replace(prefs, today_evening_from=time(17), today_daytime_penalty=0.5)
+    daytime = [event(f"Day {h}", at(9, 22, h), f"Place {h}", category=c)
+               for h, c in ((10, "Parks"), (13, "Market"), (15, "Talks & Readings"))]
+    chosen, _ = pick(daytime + [event("Show", at(9, 22, 20), "Club", category="Music")],
+                     limit=4, prefs=prefs, section="today")
+    assert len(chosen) == 4
+
+
+def test_preferences_set_an_evening_cutoff(prefs):
+    from datetime import time
+    assert prefs.today_evening_from == time(17) and prefs.today_daytime_penalty > 0

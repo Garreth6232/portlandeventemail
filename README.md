@@ -133,6 +133,12 @@ penalty. A category a source made up ("Karaoke", "Workshop") keeps its
 label in the email but ranks as "other". On a tie, a one-time event beats
 one that repeats, then the sooner one wins.
 
+In Today, anything starting before 5pm (and all-day listings) ranks 0.5
+lower, since the email lands at 8am and tonight is what people can act
+on. Daytime listings still fill in when the evening is quiet. The cutoff
+and the amount are `today_evening_from` and `today_daytime_penalty` under
+`[sections]`.
+
 Each section holds at most two listings per category and two per venue,
 and one arena show, before filling any leftover seats with the next best.
 

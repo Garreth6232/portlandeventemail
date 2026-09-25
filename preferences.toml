@@ -76,6 +76,11 @@ max_per_category = 2
 max_per_venue = 2
 # Arena and big-hall listings allowed per section.
 max_big_venue = 1
+# In Today, anything starting before this time (and all-day listings)
+# ranks this much lower, so tonight's plans lead. Daytime listings still
+# show when there isn't enough in the evening to fill the section.
+today_evening_from = "17:00"
+today_daytime_penalty = 0.5
 
 [categories]
 # 1.0 is neutral. Anything not listed here counts as 1.0.

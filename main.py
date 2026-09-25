@@ -58,7 +58,7 @@ def log_ranking(digest: Digest, prefs) -> None:
         log.info("%s: %d shown of %d. Candidates by category: %s", s.title, len(s.events), len(pool),
                  ", ".join(f"{c} {n}" for c, n in mix.most_common()))
         for e in s.events:
-            parts = ranking.breakdown(e, prefs)
+            parts = ranking.breakdown(e, prefs, s.key)
             detail = " + ".join(f"{k} {v:.1f}" for k, v in parts.items() if v)
             runs = f", {len(e.other_dates) + 1} dates" if e.other_dates else ""
             star = "*" if e is s.pick else " "

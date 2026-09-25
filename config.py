@@ -49,6 +49,8 @@ class Preferences:
     max_per_venue: int = 0            # 0 means no limit
     long_run: int = 0                 # 0 means no penalty
     long_run_penalty: float = 0.0
+    today_evening_from: Optional[time] = None  # None: no daytime penalty in Today
+    today_daytime_penalty: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -109,8 +111,15 @@ def load_preferences(path: Path = PREFERENCES_PATH) -> Preferences:
         max_per_venue=int(sections.get("max_per_venue", 0)),
         long_run=int(boosts.get("long_run", 0)),
         long_run_penalty=float(boosts.get("long_run_penalty", 0.0)),
+        today_evening_from=_clock(sections.get("today_evening_from")),
+        today_daytime_penalty=float(sections.get("today_daytime_penalty", 0.0)),
         top_pick_rotation=tuple(canonical(c) or OTHER for c in raw.get("top_pick", {}).get("rotation", [])),
     )
+
+
+def _clock(value) -> Optional[time]:
+    """"17:00" as a time; None when unset."""
+    return time.fromisoformat(value) if value else None
 
 
 _WEEKDAYS = {"monday", "tuesday", "wednesday", "thursday", "friday"}

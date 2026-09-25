@@ -120,7 +120,7 @@ def assemble(events: list[Event], window: Window, prefs: Preferences) -> Digest:
         members = [e for e in events if window.section_for(e.start) == key]
         if not members:
             continue
-        chosen, rest = ranking.pick(members, prefs.section_limits[key], prefs)
+        chosen, rest = ranking.pick(members, prefs.section_limits[key], prefs, key)
         start, end = _section_span(key, window)
         top = ranking.top_pick(chosen, window.today, offset, prefs.top_pick_rotation, picked)
         if top:
