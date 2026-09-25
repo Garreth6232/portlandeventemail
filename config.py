@@ -42,7 +42,7 @@ class Preferences:
     parks_only: tuple[str, ...]
     calendars: tuple[Calendar, ...] = ()
     subject_lines: tuple[str, ...] = ()
-    subject_by_day: dict[str, str] = field(default_factory=dict)
+    subject_by_day: dict[str, tuple[str, ...]] = field(default_factory=dict)
     headers: dict[str, tuple[str, ...]] = field(default_factory=dict)
     movie_theaters: tuple[str, ...] = ()
     top_pick_rotation: tuple[str, ...] = ()
@@ -97,8 +97,9 @@ def load_preferences(path: Path = PREFERENCES_PATH) -> Preferences:
         calendars=tuple(_calendar(c) for c in raw.get("calendars", [])),
         subject_lines=tuple(raw.get("subject", {}).get("lines", [])),
         subject_by_day={
-            day: line for day, line in raw.get("subject", {}).items()
-            if day in _WEEKDAYS and isinstance(line, str)
+            day: (lines,) if isinstance(lines, str) else tuple(lines)
+            for day, lines in raw.get("subject", {}).items()
+            if day in _WEEKDAYS
         },
         headers={
             weather.lower(): tuple([files] if isinstance(files, str) else files)

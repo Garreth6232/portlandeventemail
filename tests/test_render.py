@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 from helpers import at, event
 from mailer import render
 from pipeline import assemble
@@ -42,12 +44,39 @@ def test_more_dates_wording():
     assert render.more_dates(run) == "Runs through Fri 9/25, 4 showings"
 
 
-def test_subject_rotates_by_day(window, prefs):
-    digest = build([event("Show", category="Film")], window, prefs)
-    lines = ("A {date}", "B {weekday}")
-    assert render.subject(digest, lines, by_day={}) in {"A Tuesday, Sep 22", "B Tuesday"}
+def _picked(window, prefs):
+    """A digest whose Today section has a top pick."""
+    events = [event("Batman in 70mm", at(9, 22, 19), "Hollywood Theatre", category="Film"),
+              event("Wine Night", at(9, 22, 18), "Bar", category="Food & Drink"),
+              event("Trivia", at(9, 22, 20), "Pub", category="Trivia")]
+    return build(events, window, prefs)
+
+
+def test_subject_names_the_top_pick(window, prefs):
+    digest = _picked(window, prefs)
+    pick = digest.sections[0].pick.name
+    got = render.subject(digest, ("x",), by_day={"tuesday": ("Tuesday's move: {pick} + {more} more",)})
+    assert got == f"Tuesday's move: {pick} + 2 more"
+
+
+def test_subject_takes_turns_week_to_week(window, prefs):
+    from dataclasses import replace
+    lines = ("One: {pick}", "Two: {pick}", "Three: {pick}")
+    digest = _picked(window, prefs)
+    seen = set()
+    for weeks in range(3):
+        later = replace(digest, window=replace(digest.window, today=date(2026, 9, 22) + timedelta(weeks=weeks)))
+        seen.add(render.subject(later, ("x",), by_day={"tuesday": lines}).split(":")[0])
+    assert seen == {"One", "Two", "Three"}
     # Same day, same line, so a re-run doesn't change it.
-    assert render.subject(digest, lines, by_day={}) == render.subject(digest, lines, by_day={})
+    assert render.subject(digest, ("x",), by_day={"tuesday": lines}) == \
+        render.subject(digest, ("x",), by_day={"tuesday": lines})
+
+
+def test_subject_without_a_pick_uses_a_general_line(window, prefs):
+    digest = build([event("Show", category="Music")], window, prefs)  # too few for a pick
+    got = render.subject(digest, ("General {weekday}",), by_day={"tuesday": ("Pick: {pick}",)})
+    assert got == "General Tuesday"
 
 
 def test_subject_day_override(window, prefs):
@@ -55,9 +84,23 @@ def test_subject_day_override(window, prefs):
     assert render.subject(digest, ("x",), by_day={"tuesday": "Taco Tuesday, Portland!"}) == "Taco Tuesday, Portland!"
 
 
+def test_long_picks_are_clipped_in_the_subject(window, prefs):
+    long = "Tough Shit with Oregon Humanities: Naseem Khalili on Grief and Rage and Everything"
+    events = [event(long, at(9, 22, 19), "Tomorrow Theater", category="Film"),
+              event("Wine Night", at(9, 22, 18), "Bar", category="Food & Drink"),
+              event("Trivia", at(9, 22, 20), "Pub", category="Trivia")]
+    digest = build(events, window, prefs)
+    got = render.subject(digest, ("x",), by_day={"tuesday": ("{pick}",)})
+    assert len(got) <= render.SUBJECT_PICK_LIMIT + 1
+
+
 def test_preferences_subjects_all_format(prefs):
-    for line in prefs.subject_lines + tuple(prefs.subject_by_day.values()):
-        assert "{" not in line.format(date="Tuesday, Sep 22", weekday="Tuesday")
+    day_lines = [line for lines in prefs.subject_by_day.values() for line in lines]
+    assert set(prefs.subject_by_day) == {"monday", "tuesday", "wednesday", "thursday", "friday"}
+    for line in prefs.subject_lines + tuple(day_lines):
+        filled = line.format(date="Tuesday, Sep 22", weekday="Tuesday", pick="Batman in 70mm", more=41)
+        assert "{" not in filled and "—" not in filled
+    assert all("{pick}" not in line for line in prefs.subject_lines)  # the fallbacks can't need a pick
 
 
 def test_preheader_names_the_best_listings(window, prefs):

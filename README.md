@@ -108,10 +108,12 @@ is nowhere near the limit.
 
 ## Changing what shows up
 
-The subject line rotates through the list under `[subject]` in
-`preferences.toml`, one per day, with set lines for Mondays and Fridays.
-Add, remove or reword them there. `{date}` becomes "Tuesday, Sep 22" and
-`{weekday}` becomes "Tuesday".
+The subject line names the day's top pick, like "Hump day pick: Batman
+in 70mm". Each weekday has its own few lines under `[subject]` in
+`preferences.toml`, taking turns week to week. `{pick}` becomes the top
+pick, `{more}` the number of other listings, `{date}` "Tuesday, Sep 22"
+and `{weekday}` "Tuesday". On a day with no top pick, one of the general
+`lines` goes out instead.
 
 Everything about taste lives in `preferences.toml`: category weights,
 keyword boosts ("35mm", "natural wine"), favorite venues, which venues

@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from itertools import groupby
 from pathlib import Path
-from typing import Sequence
+from typing import Mapping, Sequence
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -29,21 +29,24 @@ _MORE_TITLES = {"today": "Also today", "week": "Also this week", "later": "Also 
 HTML_BUDGET = 95_000
 PREVIEW_NAME_LIMIT = 40
 
-# Subject lines rotate by date, so a re-run on the same day gets the same one.
-# Override or add to these under [subject] in preferences.toml.
+# Subject lines. Each weekday has its own set, taking turns week to week,
+# so this Monday's line isn't last Monday's. {pick} is the top pick in the
+# first section; a line that uses it is skipped on a day with no pick, and
+# one of the general lines is used instead. Override under [subject] in
+# preferences.toml.
 DEFAULT_SUBJECTS = (
     "Good morning, Portland! {date}",
-    "Rise and shine, Portland: {date}",
-    "Morning! Here's Portland for {weekday}",
     "What's on in Portland, {date}",
-    "Hello, Portland! Your {weekday} lineup",
-    "Portland, {weekday} edition",
     "Coffee's on. Here's Portland for {date}",
 )
-DEFAULT_DAY_SUBJECTS = {
-    "monday": "New week, Portland! {date}",
-    "friday": "Happy Friday, Portland! Here's the weekend",
+DEFAULT_DAY_SUBJECTS: dict[str, tuple[str, ...]] = {
+    "monday": ("New week, new plans: {pick}",),
+    "tuesday": ("Tuesday's move: {pick}",),
+    "wednesday": ("Hump day pick: {pick}",),
+    "thursday": ("Thursday is basically Friday: {pick}",),
+    "friday": ("Weekend loading: {pick} and {more} more",),
 }
+SUBJECT_PICK_LIMIT = 45  # characters of the pick's name before it's clipped
 
 # Category labels are colored so a glance down the list shows the mix.
 # All of these clear WCAG AA contrast on white.
@@ -230,11 +233,28 @@ def _context(digest: Digest, from_name: str, weather_line: str | None = None,
 # Output ---------------------------------------------------------------------
 
 def subject(digest: Digest, lines: Sequence[str] = DEFAULT_SUBJECTS,
-            by_day: dict[str, str] | None = None) -> str:
+            by_day: Mapping[str, Sequence[str] | str] | None = None) -> str:
     today = digest.window.today
     by_day = DEFAULT_DAY_SUBJECTS if by_day is None else by_day
-    template = by_day.get(f"{today:%A}".lower()) or lines[today.toordinal() % len(lines)]
-    return template.format(date=f"{today:%A}, {today:%b} {today.day}", weekday=f"{today:%A}")
+    pick = next((s.pick for s in digest.sections if s.pick), None)
+
+    day_lines = by_day.get(f"{today:%A}".lower()) or ()
+    if isinstance(day_lines, str):
+        day_lines = (day_lines,)
+    usable = [t for t in day_lines if pick or "{pick}" not in t]
+    if usable:
+        # Same weekday, next week: the next line in that day's set.
+        template = usable[(today.toordinal() // 7) % len(usable)]
+    else:
+        general = [t for t in lines if pick or "{pick}" not in t] or list(DEFAULT_SUBJECTS)
+        template = general[today.toordinal() % len(general)]
+
+    return template.format(
+        date=f"{today:%A}, {today:%b} {today.day}",
+        weekday=f"{today:%A}",
+        pick=_clip(pick.name, SUBJECT_PICK_LIMIT) if pick else "",
+        more=max(digest.total - 1, 0),
+    )
 
 
 def html(digest: Digest, from_name: str, banners: dict[str, dict] | None = None,
@@ -306,8 +326,8 @@ def text(digest: Digest, from_name: str, weather_line: str | None = None) -> str
     return "\n".join(lines).strip() + "\n"
 
 
-def _clip(name: str) -> str:
-    if len(name) <= PREVIEW_NAME_LIMIT:
+def _clip(name: str, limit: int = PREVIEW_NAME_LIMIT) -> str:
+    if len(name) <= limit:
         return name
-    cut = name[:PREVIEW_NAME_LIMIT].rsplit(" ", 1)[0].rstrip(":,-")
+    cut = name[:limit].rsplit(" ", 1)[0].rstrip(":,-")
     return cut + "…"
