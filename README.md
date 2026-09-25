@@ -111,9 +111,16 @@ the search is centered. Edit it, push, and the next email reflects it.
 
 How an event's score works: its category weight, plus the largest keyword
 boost it matches, plus a bump if the venue is a favorite, plus a little
-more for each extra source that lists it. The top scorers in each section
-make the email, then get sorted by time. The rest are counted in a
-"Plus 4 more this week" line.
+more for each extra source that lists it. A category a source made up
+("Karaoke", "Workshop") keeps its label in the email but ranks as
+"other". On a tie, a one-time event beats one that repeats weekly, then
+the sooner one wins. The top scorers in each section make the email, then
+get sorted by time.
+
+The rest aren't dropped. "Plus 23 more this week" links to a plain
+one-line-each list at the bottom of the email, grouped by day. Gmail hides
+anything past about 102KB behind "View entire message", so on a very full
+day the far end of Coming Up is cut short to keep the email under that.
 
 ## Weather
 
@@ -196,6 +203,14 @@ If every source fails, the job exits with an error instead of sending an
 empty email, and GitHub emails you about the failed run.
 
 ## Adding a source
+
+To check whether a site can be read before writing anything, add it to
+`CANDIDATES` in `probe.py` and run Actions > Probe sources. It tries each
+site from GitHub's servers (some sites answer a laptop but block GitHub),
+respects robots.txt, and lists what it found on the run's summary page:
+an Events Calendar feed, schema.org event data, RSS, iCal links, and which
+ticketing site the venue sells through.
+
 
 Write a module in `sources/` with a `fetch(settings, window)` function that
 returns a list of `Event`, then add it to `SOURCES` in `sources/__init__.py`.

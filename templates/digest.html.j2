@@ -98,10 +98,36 @@
   {% endfor %}
   {% if section.overflow %}
         <tr>
-          <td style="border-top:1px solid {{ rule }}; padding-top:12px; font-family:{{ sans }}; font-size:14px; color:{{ faint }};">{{ section.overflow }}</td>
+          <td style="border-top:1px solid {{ rule }}; padding-top:12px; font-family:{{ sans }}; font-size:14px; color:{{ faint }};">{% if section.more %}<a href="#more-{{ section.key }}" style="color:{{ faint }};">{{ section.overflow }}</a>{% else %}{{ section.overflow }}{% endif %}</td>
         </tr>
   {% endif %}
 {% endfor %}
+
+{% if has_more %}
+        {# Everything that didn't make a section, one short line each. Kept
+           plain on purpose: this list can run long, and Gmail clips big emails. #}
+        <tr>
+          <td style="padding-top:44px; padding-bottom:4px; border-bottom:2px solid {{ ink }}; font-family:{{ serif }}; font-size:22px; line-height:1.25; color:{{ ink }};">The full list</td>
+        </tr>
+  {% for section in sections if section.more %}
+        <tr>
+          <td id="more-{{ section.key }}" style="padding-top:18px; font-family:{{ sans }}; font-size:14px; line-height:1.5; color:{{ muted }};">
+            <a name="more-{{ section.key }}"></a><div style="font-size:12px; font-weight:700; letter-spacing:0.6px; text-transform:uppercase; color:{{ accent }}; padding-bottom:4px;">{{ section.more_title }}</div>
+    {% for day in section.more %}
+      {% if day.day %}
+            <div style="padding:10px 0 2px; font-weight:700; color:{{ ink }};">{{ day.day }}</div>
+      {% endif %}
+      {% for line in day.lines %}
+            <div style="padding:2px 0;">{{ line.when }}&nbsp; <a href="{{ line.url }}" style="color:{{ ink }};">{{ line.name }}</a>{% if line.venue %} &middot; {{ line.venue }}{% endif %}</div>
+      {% endfor %}
+    {% endfor %}
+    {% if section.unlisted %}
+            <div style="padding:3px 0; color:{{ faint }};">And {{ section.unlisted }} more.</div>
+    {% endif %}
+          </td>
+        </tr>
+  {% endfor %}
+{% endif %}
 
       </table>
     </td>

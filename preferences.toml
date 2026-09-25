@@ -68,7 +68,7 @@ max_big_venue = 2
 [boosts]
 # Added to an event's score when its name or venue contains the word.
 # Only the largest matching boost counts, so they don't stack.
-keywords = { "wine" = 0.5, "winery" = 0.4, "natural wine" = 0.5, "tasting" = 0.3, "pop-up" = 0.3, "35mm" = 0.5, "70mm" = 0.5, "16mm" = 0.4, "double feature" = 0.3, "retrospective" = 0.3, "q&a" = 0.3, "premiere" = 0.2, "screening" = 0.2, "outdoor movie" = 0.3 }
+keywords = { "wine" = 0.5, "winery" = 0.4, "natural wine" = 0.5, "pop-up" = 0.3, "35mm" = 0.5, "70mm" = 0.5, "16mm" = 0.4, "double feature" = 0.3, "retrospective" = 0.3, "q&a" = 0.3, "premiere" = 0.2, "screening" = 0.2, "outdoor movie" = 0.3 }
 
 # Venues we like. Anything here gets venue_boost on top of the above.
 favorite_venues = [

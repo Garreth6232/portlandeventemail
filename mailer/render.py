@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from itertools import groupby
 from pathlib import Path
 from typing import Sequence
 
@@ -21,6 +22,11 @@ _env = Environment(
 )
 
 _OVERFLOW = {"today": "today", "week": "this week", "later": "coming up"}
+_MORE_TITLES = {"today": "Also today", "week": "Also this week", "later": "Also coming up"}
+
+# Gmail hides everything past about 102KB of HTML behind "View entire
+# message". The full list at the bottom shrinks until the email fits.
+HTML_BUDGET = 95_000
 PREVIEW_NAME_LIMIT = 40
 MIN_FOR_PICK = 3  # a "top pick" among two listings isn't saying much
 
@@ -136,15 +142,51 @@ def _row(event: Event, section_key: str, pick: bool) -> dict:
     }
 
 
-def _section(s: Section) -> dict:
+def _line(event: Event) -> dict:
+    """One compact line in the full list at the bottom."""
+    return {
+        "when": event.when or clock(event.start),
+        "name": event.name,
+        "url": event.url,
+        "venue": _shown_venue(event),
+    }
+
+
+def _by_day(events: list[Event], section_key: str) -> list[dict]:
+    """The full list's lines grouped under day headings. Today's need none."""
+    if section_key == "today":
+        return [{"day": None, "lines": [_line(e) for e in events]}]
+    return [
+        {"day": short_day(day), "lines": [_line(e) for e in group]}
+        for day, group in groupby(events, key=lambda e: e.start.date())
+    ]
+
+
+def _section(s: Section, more_limit: int | None = None) -> dict:
+    """`more_limit` caps how many of the rest get a line at the bottom;
+    None means all of them."""
     # s.events arrive best-first; the first one is the section's top pick.
     top = s.events[0] if len(s.events) >= MIN_FOR_PICK else None
+    listed = s.rest if more_limit is None else s.rest[:more_limit]
     return {
+        "key": s.key,
         "title": s.title,
         "span": span(s),
         "rows": [_row(e, s.key, e is top) for e in sorted(s.events, key=lambda e: e.start)],
-        "overflow": f"Plus {s.overflow} more {_OVERFLOW[s.key]}." if s.overflow else None,
+        "overflow": _overflow_line(s, len(listed)),
+        "more_title": _MORE_TITLES[s.key],
+        "more": _by_day(listed, s.key) if listed else [],
+        "unlisted": s.overflow - len(listed),
     }
+
+
+def _overflow_line(s: Section, listed: int) -> str | None:
+    if not s.overflow:
+        return None
+    where = _OVERFLOW[s.key]
+    if not listed:
+        return f"Plus {s.overflow} more {where}."
+    return f"Plus {s.overflow} more {where}, listed at the bottom."
 
 
 def _preheader(digest: Digest) -> str:
@@ -158,15 +200,31 @@ def _preheader(digest: Digest) -> str:
     return f"{lead}, plus {rest} more" if rest else lead
 
 
-def _context(digest: Digest, from_name: str, weather_line: str | None = None) -> dict:
+def _limits(digest: Digest, total: int | None) -> list[int | None]:
+    """Split `total` lines at the bottom across sections in order, so the
+    nearest dates keep theirs and Coming Up is trimmed first."""
+    if total is None:
+        return [None] * len(digest.sections)
+    limits = []
+    for s in digest.sections:
+        take = min(total, s.overflow)
+        limits.append(take)
+        total -= take
+    return limits
+
+
+def _context(digest: Digest, from_name: str, weather_line: str | None = None,
+             more_total: int | None = None) -> dict:
     counts = [f"{len(s.events) + s.overflow} {_OVERFLOW[s.key]}" for s in digest.sections]
+    sections = [_section(s, limit) for s, limit in zip(digest.sections, _limits(digest, more_total))]
     return {
         "from_name": from_name,
         "date_line": long_day(digest.window.today),
         "weather": weather_line,
         "summary": join(counts),
         "preheader": _preheader(digest),
-        "sections": [_section(s) for s in digest.sections],
+        "sections": sections,
+        "has_more": any(sec["more"] for sec in sections),
         "sources": join(digest.source_labels),
     }
 
@@ -183,12 +241,26 @@ def subject(digest: Digest, lines: Sequence[str] = DEFAULT_SUBJECTS,
 
 def html(digest: Digest, from_name: str, banners: dict[str, dict] | None = None,
          weather_line: str | None = None) -> str:
-    """`banners` maps "header"/"footer" to {"src", "alt"}; see mailer/banners.py."""
-    return _env.get_template("digest.html.j2").render(
-        **_context(digest, from_name, weather_line),
-        banners=banners or {},
-        width=DISPLAY_WIDTH,
-    )
+    """`banners` maps "header"/"footer" to {"src", "alt"}; see mailer/banners.py.
+
+    Everything that didn't make a section is listed compactly at the
+    bottom. On a very full day that list is cut short, from the far end,
+    to keep the email under Gmail's clipping size."""
+    template = _env.get_template("digest.html.j2")
+
+    def render_with(more_total: int | None) -> str:
+        return template.render(
+            **_context(digest, from_name, weather_line, more_total),
+            banners=banners or {},
+            width=DISPLAY_WIDTH,
+        )
+
+    out = render_with(None)
+    total = sum(s.overflow for s in digest.sections)
+    while len(out.encode()) > HTML_BUDGET and total > 0:
+        total = max(0, total - 10)
+        out = render_with(total)
+    return out
 
 
 def text(digest: Digest, from_name: str, weather_line: str | None = None) -> str:
@@ -212,6 +284,20 @@ def text(digest: Digest, from_name: str, weather_line: str | None = None) -> str
             lines += [row["url"], ""]
         if section["overflow"]:
             lines += [section["overflow"], ""]
+
+    for section in ctx["sections"]:
+        if not section["more"]:
+            continue
+        lines += [section["more_title"].upper(), ""]
+        for day in section["more"]:
+            if day["day"]:
+                lines.append(day["day"])
+            for line in day["lines"]:
+                venue = f" · {line['venue']}" if line["venue"] else ""
+                lines += [f"  {line['when']}  {line['name']}{venue}", f"  {line['url']}"]
+            lines.append("")
+        if section["unlisted"]:
+            lines += [f"And {section['unlisted']} more.", ""]
 
     if ctx["sources"]:
         lines.append(f"Listings from {ctx['sources']}.")

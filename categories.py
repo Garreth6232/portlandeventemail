@@ -24,12 +24,13 @@ _ALIASES = {
     FILM: ["film", "films", "movie", "movies", "cinema", "screening", "screenings & experiences"],
     FOOD_DRINK: ["food & drink", "food and drink", "food", "drink", "drinks", "wine", "beer",
                  "cocktails", "tasting", "winemaker dinner"],
-    MUSIC: ["music", "concert", "concerts", "live music", "dj", "band", "classical", "jazz"],
+    MUSIC: ["music", "concert", "concerts", "live music", "dj", "band", "classical", "jazz",
+            "dance party", "dance night", "dj night"],
     COMEDY: ["comedy", "stand up", "stand-up", "improv"],
     ARTS: ["arts & theatre", "arts and theatre", "theatre", "theater", "broadway tickets national",
            "broadway", "art", "arts", "dance", "drag", "burlesque", "exhibition", "exhibitions"],
     TALKS: ["talks & readings", "readings & talks", "literary", "reading", "readings", "lecture",
-            "lectures", "author", "books"],
+            "lectures", "author", "books", "poetry"],
     SPORTS: ["sports", "nba", "wnba", "nhl", "mls", "nwsl", "hockey", "soccer", "basketball",
              "ncaa football", "ncaa basketball", "minor league baseball", "baseball", "football"],
     PARKS: ["parks", "parks & rec", "outdoors", "nature", "garden"],
@@ -41,6 +42,9 @@ _ALIASES = {
     VOLUNTEER: ["volunteer"],
     OTHER: ["miscellaneous", "undefined", "other"],
 }
+# Every label this module can hand out. Anything else a source invents
+# ("Karaoke", "Workshop") keeps its name on screen but ranks as Other.
+LABELS = frozenset(_ALIASES)
 _LOOKUP = {alias: label for label, aliases in _ALIASES.items() for alias in aliases}
 
 # For sources whose own labels are missing or too vague, words in the title
@@ -49,7 +53,7 @@ _TITLE_WORDS = (
     (("movie", "film", "cinema", "screening", "35mm", "70mm"), FILM),
     (("trivia", "quiz night"), TRIVIA),
     (("comedy", "stand-up", "improv"), COMEDY),
-    (("wine", "tasting", "winemaker", "brewery", "beer", "cider"), FOOD_DRINK),
+    (("wine", "winemaker", "brewery", "beer", "cider"), FOOD_DRINK),
     (("concert", "live music", "band", "orchestra", "symphony", " dj "), MUSIC),
     (("reading", "author", "lecture", "in conversation", "book launch"), TALKS),
     (("volunteer", "clean-up", "cleanup", "restoration", "weed pull"), VOLUNTEER),
@@ -60,7 +64,7 @@ _TITLE_WORDS = (
 
 def canonical(raw: Optional[str]) -> Optional[str]:
     """Shared label for a source's category. Unknown labels pass through,
-    title-cased, and rank with the neutral default weight."""
+    title-cased, for display; ranking treats them as Other."""
     if not raw:
         return None
     key = raw.replace("_", " ").strip().lower()
