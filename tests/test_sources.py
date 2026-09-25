@@ -182,12 +182,11 @@ def _feed(*links):
     return f'<?xml version="1.0"?><rss version="2.0"><channel>{items}</channel></rss>'.encode()
 
 
-def test_pdx_pipeline_looks_on_the_second_feed_page(monkeypatch):
-    pages = {
-        None: _feed("https://www.pdxpipeline.com/2026/09/25/a-post/"),
-        2: _feed("https://www.pdxpipeline.com/week/", "https://www.pdxpipeline.com/older/"),
-    }
-    asked = []
+def _serve_feed(monkeypatch, pages, fail=()):
+    """Stand in for the feed: pages maps a page number (None for the first)
+    to feed XML. Returns the pages asked for and the sleeps taken."""
+    import requests
+    asked, slept = [], []
 
     class Resp:
         def __init__(self, content):
@@ -196,13 +195,63 @@ def test_pdx_pipeline_looks_on_the_second_feed_page(monkeypatch):
     def fake_get(url, params=None):
         page = (params or {}).get("paged")
         asked.append(page)
+        if page in fail:
+            raise requests.ConnectionError("gone")
         return Resp(pages[page])
 
     monkeypatch.setattr(pdx_pipeline.net, "get", fake_get)
-    monkeypatch.setattr(pdx_pipeline, "parse_roundup", lambda html, today, tz: ["found"])
-    window = Window(TODAY, TZ)
-    assert pdx_pipeline.fetch(None, window) == ["found"]
+    monkeypatch.setattr(pdx_pipeline.time, "sleep", slept.append)
+    monkeypatch.setattr(pdx_pipeline, "parse_roundup", lambda html, today, tz, url: [url])
+    return asked, slept
+
+
+def test_pdx_pipeline_looks_on_the_second_feed_page(monkeypatch):
+    asked, slept = _serve_feed(monkeypatch, {
+        None: _feed("https://www.pdxpipeline.com/2026/09/25/a-post/"),
+        2: _feed("https://www.pdxpipeline.com/week/", "https://www.pdxpipeline.com/older/"),
+    })
+    assert pdx_pipeline.fetch(None, Window(TODAY, TZ)) == ["https://www.pdxpipeline.com/week/"]
     assert asked == [None, 2]
+    assert slept == [pdx_pipeline.CRAWL_DELAY]  # their robots.txt asks for it
+
+
+def test_pdx_pipeline_finds_the_weekday_roundup_on_page_two_when_the_weekend_one_is_up(monkeypatch):
+    # A Thursday: the new weekend post is on top, the weekday one has slid back.
+    asked, _ = _serve_feed(monkeypatch, {
+        None: _feed("https://www.pdxpipeline.com/weekend/"),
+        2: _feed("https://www.pdxpipeline.com/week/"),
+    })
+    got = pdx_pipeline.fetch(None, Window(TODAY, TZ))
+    assert sorted(got) == ["https://www.pdxpipeline.com/week/", "https://www.pdxpipeline.com/weekend/"]
+    assert asked == [None, 2]
+
+
+def test_pdx_pipeline_stops_once_both_roundups_are_found(monkeypatch):
+    asked, slept = _serve_feed(monkeypatch, {
+        None: _feed("https://www.pdxpipeline.com/weekend/", "https://www.pdxpipeline.com/week/"),
+    })
+    assert len(pdx_pipeline.fetch(None, Window(TODAY, TZ))) == 2
+    assert asked == [None] and slept == []
+
+
+def test_pdx_pipeline_keeps_page_one_when_page_two_fails(monkeypatch):
+    _serve_feed(monkeypatch, {None: _feed("https://www.pdxpipeline.com/weekend/")}, fail={2})
+    assert pdx_pipeline.fetch(None, Window(TODAY, TZ)) == ["https://www.pdxpipeline.com/weekend/"]
+
+
+def test_pdx_pipeline_lines_without_a_link_point_at_their_roundup():
+    html = "<h3>Portland Friday Events, September 25:</h3><ul><li><strong>Music:</strong> Show @ Bar | 8PM</li></ul>"
+    (e,) = pdx_pipeline.parse_roundup(html, date(2026, 9, 25), TZ, "https://www.pdxpipeline.com/weekend/")
+    assert e.url == "https://www.pdxpipeline.com/weekend/"
+
+
+def test_pdx_pipeline_reads_the_weekend_roundup_too():
+    feed = _feed("https://www.pdxpipeline.com/weekend/",
+                 "https://www.pdxpipeline.com/portland-in-the-news-september-24-2026/",
+                 "https://www.pdxpipeline.com/week/",
+                 "https://www.pdxpipeline.com/weekend-brunch-guide-2026/")
+    links = [e.link for e in pdx_pipeline.find_roundups(feed)]
+    assert links == ["https://www.pdxpipeline.com/weekend/", "https://www.pdxpipeline.com/week/"]
 
 
 def _movie_day(theaters=()):
