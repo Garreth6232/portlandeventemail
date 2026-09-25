@@ -3,7 +3,8 @@ import time
 from datetime import date, datetime, timezone
 
 from helpers import FIXTURES, TODAY, TZ, Window
-from sources import hollywood_theatre, pdx_pipeline, portland_parks, seatgeek, ticketmaster, vine_and_dine
+from sources import (hollywood_theatre, pdx_movie_times, pdx_pipeline, portland_parks, seatgeek,
+                     ticketmaster, vine_and_dine)
 
 
 # Ticketmaster ----------------------------------------------------------------
@@ -202,3 +203,78 @@ def test_pdx_pipeline_looks_on_the_second_feed_page(monkeypatch):
     window = Window(TODAY, TZ)
     assert pdx_pipeline.fetch(None, window) == ["found"]
     assert asked == [None, 2]
+
+
+def _movie_day(theaters=()):
+    html = (FIXTURES / "pdxmovietimes_day.html").read_text()
+    return pdx_movie_times.parse_day(html, date(2026, 9, 26), TZ, theaters)
+
+
+def test_pdx_movie_times_reads_every_showtime():
+    events = _movie_day()
+    assert len(events) == 8
+    coyote = [e for e in events if e.name == "Coyote vs. Acme"]
+    assert [e.start.strftime("%H:%M") for e in coyote] == ["12:45", "16:00", "18:45"]
+    assert all(e.venue == "Laurelhurst Theater" and e.category == "Film" for e in coyote)
+    assert coyote[0].url.endswith("rtsPerformanceID=045773000021")
+
+
+def test_pdx_movie_times_keeps_only_listed_theaters():
+    events = _movie_day(["Hollywood Theatre", "laurelhurst"])
+    assert {e.venue for e in events} == {"Hollywood Theatre", "Laurelhurst Theater"}
+
+
+def test_pdx_movie_times_notes_format_and_double_features():
+    names = {e.name for e in _movie_day()}
+    assert "Batman in 70mm" in names
+    assert "Obsession (double feature)" in names
+
+
+def test_pdx_movie_times_static_showtime_links_to_the_film_page():
+    (obsession,) = [e for e in _movie_day() if e.name.startswith("Obsession")]
+    assert obsession.start.hour == 21
+    assert obsession.url == "https://www.pdxmovietimes.com/movie/obsession"
+
+
+def test_pdx_movie_times_morning_and_noon_times():
+    starts = {e.name: e.start for e in _movie_day()}
+    assert starts["Avengers: Endgame"].strftime("%H:%M") == "09:45"
+    coyote = min(e.start for e in _movie_day() if e.name == "Coyote vs. Acme")
+    assert coyote.strftime("%H:%M") == "12:45"
+
+
+def test_pdx_movie_times_fetches_each_day_and_stops_on_a_later_failure(monkeypatch, prefs):
+    import requests
+    from dataclasses import replace
+    html = (FIXTURES / "pdxmovietimes_day.html").read_text()
+    asked = []
+
+    class Resp:
+        text = html
+
+    def fake_get(url, **kwargs):
+        asked.append(url)
+        if len(asked) == 3:
+            raise requests.ConnectionError("gone")
+        return Resp()
+
+    laurelhurst_only = replace(prefs, movie_theaters=("Laurelhurst",))
+
+    class Settings:
+        prefs = laurelhurst_only
+
+    monkeypatch.setattr(pdx_movie_times.net, "get", fake_get)
+    events = pdx_movie_times.fetch(Settings, Window(TODAY, TZ))
+    assert asked[:2] == ["https://www.pdxmovietimes.com/day/2026-09-22",
+                         "https://www.pdxmovietimes.com/day/2026-09-23"]
+    assert len(asked) == 3 and len(events) == 6  # three Laurelhurst showtimes a day, two days
+
+
+def test_pdx_movie_times_showtimes_fold_into_one_listing(window, prefs):
+    from pipeline import assemble
+    html = (FIXTURES / "pdxmovietimes_day.html").read_text()
+    events = [e for day in (date(2026, 9, 22), date(2026, 9, 23))
+              for e in pdx_movie_times.parse_day(html, day, TZ, ["Laurelhurst"])]
+    digest = assemble(events, window, prefs)
+    (coyote,) = [e for s in digest.sections for e in s.events + s.rest]
+    assert len(coyote.other_dates) == 5

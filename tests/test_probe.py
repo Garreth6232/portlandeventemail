@@ -16,3 +16,10 @@ def test_robots_disallow_is_respected():
     assert probe.allowed(robots, "https://x.org/events/")
     assert not probe.allowed(robots, "https://x.org/private/list")
     assert probe.allowed(None, "https://x.org/private/list")
+
+
+def test_ical_links_are_calendar_files_not_words():
+    assert probe._ICAL.search("https://x.org/events.ics")
+    assert probe._ICAL.search("webcal://x.org/?post_type=tribe_events&ical=1")
+    assert not probe._ICAL.search("https://x.org/movie/practical-magic-2")
+    assert not probe._ICAL.search("https://x.org/theater/omsi-empirical-theater")

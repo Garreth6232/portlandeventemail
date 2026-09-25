@@ -16,6 +16,7 @@ from models import Event, Window
 from . import (
     events_calendar,
     hollywood_theatre,
+    pdx_movie_times,
     pdx_pipeline,
     portland_parks,
     seatgeek,
@@ -48,6 +49,8 @@ SOURCES: tuple[Source, ...] = (
     Source(seatgeek.KEY, "SeatGeek", seatgeek.fetch, priority=4,
            ticketed=True, requires="seatgeek_client_id"),
     Source(hollywood_theatre.KEY, "Hollywood Theatre", hollywood_theatre.fetch, priority=3),
+    # Below the theaters' own calendars, above the roundups.
+    Source(pdx_movie_times.KEY, "PDX Movie Times", pdx_movie_times.fetch, priority=2),
     Source(portland_parks.KEY, "Portland Parks & Recreation", portland_parks.fetch, priority=2),
     Source(pdx_pipeline.KEY, "PDX Pipeline", pdx_pipeline.fetch, priority=1),
     Source(vine_and_dine.KEY, "PDX Vine and Dine", vine_and_dine.fetch, priority=0),
