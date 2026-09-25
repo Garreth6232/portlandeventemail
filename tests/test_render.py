@@ -175,3 +175,22 @@ def test_full_list_is_trimmed_to_stay_under_gmails_clip(window, prefs, monkeypat
 def test_no_full_list_when_everything_fits(window, prefs):
     out = render.html(build([event("Film", category="Film")], window, prefs), "x")
     assert "The full list" not in out
+
+
+def test_subject_skips_a_pick_with_a_swear_word(window, prefs):
+    rude = "Tough Shit with Oregon Humanities"
+    today = [event(rude, at(9, 22, 19), "Tomorrow Theater", category="Film"),
+             event("Wine Night", at(9, 22, 18), "Bar", category="Food & Drink"),
+             event("Trivia", at(9, 22, 20), "Pub", category="Trivia")]
+    week = [event(f"Show {i}", at(9, 24, 19), f"Club {i}", category=c)
+            for i, c in enumerate(("Music", "Talks & Readings", "Comedy"))]
+    digest = build(today + week, window, prefs)
+    if digest.sections[0].pick.name != rude:  # make sure the rude one is Today's pick
+        digest.sections[0].pick = next(e for e in digest.sections[0].events if e.name == rude)
+    got = render.subject(digest, ("General",), by_day={"tuesday": ("Pick: {pick}",)})
+    assert "Shit" not in got and got == f"Pick: {digest.sections[1].pick.name}"
+    # With no clean pick anywhere, a general line goes out.
+    digest.sections[1].pick = None
+    assert render.subject(digest, ("General",), by_day={"tuesday": ("Pick: {pick}",)}) == "General"
+    # The listing itself is still in the email.
+    assert rude in render.text(digest, "x")

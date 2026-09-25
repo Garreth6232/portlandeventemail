@@ -1,6 +1,7 @@
 """Turns a Digest into a subject line, an HTML body, and a plain-text body."""
 from __future__ import annotations
 
+import re
 from datetime import date, datetime
 from itertools import groupby
 from pathlib import Path
@@ -47,6 +48,10 @@ DEFAULT_DAY_SUBJECTS: dict[str, tuple[str, ...]] = {
     "friday": ("Weekend loading: {pick} and {more} more",),
 }
 SUBJECT_PICK_LIMIT = 45  # characters of the pick's name before it's clipped
+# Event titles go straight into people's inboxes via {pick}. One with any of
+# these words is left out of the subject (it still appears in the email).
+_NOT_FOR_SUBJECTS = re.compile(
+    r"\b(shit\w*|fuck\w*|bitch\w*|cunt\w*|dick\w*|cock\w*|pussy|asshole\w*|damn\w*)\b", re.IGNORECASE)
 
 # Category labels are colored so a glance down the list shows the mix.
 # All of these clear WCAG AA contrast on white.
@@ -236,7 +241,10 @@ def subject(digest: Digest, lines: Sequence[str] = DEFAULT_SUBJECTS,
             by_day: Mapping[str, Sequence[str] | str] | None = None) -> str:
     today = digest.window.today
     by_day = DEFAULT_DAY_SUBJECTS if by_day is None else by_day
-    pick = next((s.pick for s in digest.sections if s.pick), None)
+    # The first section's pick, or the next one if its name isn't fit for a
+    # subject line.
+    pick = next((s.pick for s in digest.sections
+                 if s.pick and not _NOT_FOR_SUBJECTS.search(s.pick.name)), None)
 
     day_lines = by_day.get(f"{today:%A}".lower()) or ()
     if isinstance(day_lines, str):
