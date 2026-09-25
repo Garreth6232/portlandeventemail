@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from difflib import SequenceMatcher
 from itertools import groupby
+from typing import Optional
 
 import requests
 
@@ -40,6 +41,7 @@ class Section:
     end: date
     events: list[Event]  # chosen, best first
     rest: list[Event]    # the ones that didn't make it, by date
+    pick: Optional[Event] = None  # the "Top pick", one of events
 
     @property
     def overflow(self) -> int:
@@ -113,13 +115,17 @@ def assemble(events: list[Event], window: Window, prefs: Preferences) -> Digest:
     events = group_series(dedupe(events, priority))
 
     sections = []
-    for key, title in SECTION_TITLES.items():
+    picked: set[str] = set()  # top-pick categories used so far in this email
+    for offset, (key, title) in enumerate(SECTION_TITLES.items()):
         members = [e for e in events if window.section_for(e.start) == key]
         if not members:
             continue
         chosen, rest = ranking.pick(members, prefs.section_limits[key], prefs)
         start, end = _section_span(key, window)
-        sections.append(Section(key, title, start, end, chosen, rest))
+        top = ranking.top_pick(chosen, window.today, offset, prefs.top_pick_rotation, picked)
+        if top:
+            picked.add(ranking.bucket(top.category))
+        sections.append(Section(key, title, start, end, chosen, rest, top))
 
     used = {key for s in sections for e in s.events + s.rest for key in e.sources}
     labels = [s.label for s in sources if s.key in used]

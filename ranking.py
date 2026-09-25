@@ -2,14 +2,16 @@
 
 An event's score is its category weight, plus the largest keyword boost it
 matches, plus a boost for favorite venues, plus a little for every extra
-source that lists it. A category label a source made up ("Karaoke",
+source that lists it, minus a penalty for long runs (a film playing all
+month, weekly trivia). A category label a source made up ("Karaoke",
 "Workshop") counts as Other, for its weight and for the per-category cap.
 On equal scores, a one-time event beats one that repeats, then the sooner
 one wins.
 
 Picking happens in two passes. The first takes the best scorers while
-holding each category to max_per_category, so a section shows a spread
-(a film, a tasting, a show, a market) instead of eight screenings. The
+holding each category to max_per_category and each venue to
+max_per_venue, so a section shows a spread (a film, a tasting, a show, a
+market) instead of eight screenings. The
 second fills any seats left over with the best of what's left, so a quiet
 week isn't cut short by the variety rule. Big-venue listings are capped in
 both passes. The renderer puts the winners back in date order.
@@ -18,14 +20,18 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from datetime import date
 from functools import lru_cache
+from typing import Collection, Sequence
 
 from categories import LABELS, OTHER
 from config import Preferences
 from models import Event
+from text import normalize
 
 DEFAULT_WEIGHT = 1.0
 CONFIRMATION_BONUS = 0.3
+MIN_FOR_PICK = 3  # a "top pick" among two listings isn't saying much
 
 
 @lru_cache(maxsize=256)
@@ -38,17 +44,26 @@ def bucket(category: str | None) -> str:
     return category if category in LABELS else OTHER
 
 
-def score(event: Event, prefs: Preferences) -> float:
-    weight = prefs.category_weights.get(bucket(event.category).lower(), DEFAULT_WEIGHT)
-
+def breakdown(event: Event, prefs: Preferences) -> dict[str, float]:
+    """The parts of an event's score, for explaining a ranking."""
     text = f"{event.name} {event.venue}".lower()
-    boost = max((b for kw, b in prefs.keyword_boosts.items() if _word(kw).search(text)), default=0.0)
-
+    matched = [(b, kw) for kw, b in prefs.keyword_boosts.items() if _word(kw).search(text)]
     venue = event.venue.lower()
-    if any(v.lower() in venue for v in prefs.favorite_venues):
-        boost += prefs.venue_boost
+    return {
+        "category": prefs.category_weights.get(bucket(event.category).lower(), DEFAULT_WEIGHT),
+        "keyword": max(matched)[0] if matched else 0.0,
+        "venue": prefs.venue_boost if any(v.lower() in venue for v in prefs.favorite_venues) else 0.0,
+        "sources": CONFIRMATION_BONUS * (len(event.sources) - 1),
+        "long run": -prefs.long_run_penalty if _long_run(event, prefs) else 0.0,
+    }
 
-    return weight + boost + CONFIRMATION_BONUS * (len(event.sources) - 1)
+
+def _long_run(event: Event, prefs: Preferences) -> bool:
+    return prefs.long_run > 0 and len(event.other_dates) + 1 >= prefs.long_run
+
+
+def score(event: Event, prefs: Preferences) -> float:
+    return sum(breakdown(event, prefs).values())
 
 
 def _order(prefs: Preferences):
@@ -61,6 +76,7 @@ def pick(events: list[Event], limit: int, prefs: Preferences) -> tuple[list[Even
     chosen: list[Event] = []
     taken: set[int] = set()
     per_category: Counter[str] = Counter()
+    per_venue: Counter[str] = Counter()
     big = 0
 
     for varied in (True, False):
@@ -72,13 +88,39 @@ def pick(events: list[Event], limit: int, prefs: Preferences) -> tuple[list[Even
             if event.big_venue and big == prefs.max_big:
                 continue
             category = bucket(event.category)
+            venue = normalize(event.venue)
             if varied and per_category[category] == prefs.max_per_category:
+                continue
+            if varied and prefs.max_per_venue and per_venue[venue] == prefs.max_per_venue:
                 continue
             chosen.append(event)
             taken.add(id(event))
             per_category[category] += 1
+            per_venue[venue] += 1
             big += event.big_venue
 
     chosen.sort(key=_order(prefs))
     rest = sorted((e for e in events if id(e) not in taken), key=lambda e: e.start)
     return chosen, rest
+
+
+def top_pick(chosen: list[Event], day: date, offset: int, rotation: Sequence[str],
+             taken: Collection[str] = ()) -> Event | None:
+    """The section's top pick, taking turns by category.
+
+    Each day the rotation moves one category along, and each section starts
+    `offset` further on, so one email's picks differ and tomorrow's differ
+    from today's. The pick is the best listing shown in that category; if
+    the section has none, the next category in the rotation is tried.
+    Categories in `taken` (earlier sections' picks) are skipped unless
+    nothing else fits. `chosen` is best first, as pick() returns it."""
+    if len(chosen) < MIN_FOR_PICK:
+        return None
+    if rotation:
+        start = (day.toordinal() + offset) % len(rotation)
+        order = rotation[start:] + rotation[:start]
+        for category in [c for c in order if c not in taken] + [c for c in order if c in taken]:
+            match = next((e for e in chosen if bucket(e.category) == category), None)
+            if match:
+                return match
+    return chosen[0]

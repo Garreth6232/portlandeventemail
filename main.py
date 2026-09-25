@@ -13,6 +13,7 @@ import argparse
 import logging
 import os
 import sys
+from collections import Counter
 from datetime import date, datetime, time
 from pathlib import Path
 from typing import Optional
@@ -21,7 +22,8 @@ from zoneinfo import ZoneInfo
 from config import load_settings
 from mailer import banners, render
 from mailer.send import build_message, send
-from pipeline import NoSourcesAvailable, build_digest
+from pipeline import Digest, NoSourcesAvailable, build_digest
+import ranking
 import weather
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -45,6 +47,23 @@ def _mark_sent() -> None:
     if output:
         with open(output, "a") as f:
             f.write("sent=true\n")
+
+
+def log_ranking(digest: Digest, prefs) -> None:
+    """For previews: what each section chose and why, and what it had to
+    choose from."""
+    for s in digest.sections:
+        pool = s.events + s.rest
+        mix = Counter(ranking.bucket(e.category) for e in pool)
+        log.info("%s: %d shown of %d. Candidates by category: %s", s.title, len(s.events), len(pool),
+                 ", ".join(f"{c} {n}" for c, n in mix.most_common()))
+        for e in s.events:
+            parts = ranking.breakdown(e, prefs)
+            detail = " + ".join(f"{k} {v:.1f}" for k, v in parts.items() if v)
+            runs = f", {len(e.other_dates) + 1} dates" if e.other_dates else ""
+            star = "*" if e is s.pick else " "
+            log.info(" %s%.1f  %-14s %s @ %s (%s%s)", star, sum(parts.values()), ranking.bucket(e.category),
+                     e.name[:50], e.venue[:30], detail, runs)
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -93,6 +112,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     log.info("Header: %s", images[0].path.name if images else "none")
 
     if args.dry_run:
+        log_ranking(digest, prefs)
         preview = render.html(digest, settings.from_name, banners.sources(images, inline=False), weather_line)
         args.output.write_text(preview)
         args.output.with_suffix(".txt").write_text(text)

@@ -28,7 +28,6 @@ _MORE_TITLES = {"today": "Also today", "week": "Also this week", "later": "Also 
 # message". The full list at the bottom shrinks until the email fits.
 HTML_BUDGET = 95_000
 PREVIEW_NAME_LIMIT = 40
-MIN_FOR_PICK = 3  # a "top pick" among two listings isn't saying much
 
 # Subject lines rotate by date, so a re-run on the same day gets the same one.
 # Override or add to these under [subject] in preferences.toml.
@@ -165,8 +164,7 @@ def _by_day(events: list[Event], section_key: str) -> list[dict]:
 def _section(s: Section, more_limit: int | None = None) -> dict:
     """`more_limit` caps how many of the rest get a line at the bottom;
     None means all of them."""
-    # s.events arrive best-first; the first one is the section's top pick.
-    top = s.events[0] if len(s.events) >= MIN_FOR_PICK else None
+    top = s.pick
     listed = s.rest if more_limit is None else s.rest[:more_limit]
     return {
         "key": s.key,

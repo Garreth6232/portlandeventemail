@@ -78,8 +78,9 @@ def test_labels_colors_and_top_pick(window, prefs):
     out = render.html(build(events, window, prefs), "x")
     assert render.CATEGORY_COLORS["Film"] in out
     assert "Top pick" in out and out.count("Top pick") == 1
-    text = render.text(build(events, window, prefs), "x")
-    assert "Film · Top pick" in text
+    digest = build(events, window, prefs)
+    pick = digest.sections[0].pick
+    assert f"{pick.category} · Top pick" in render.text(digest, "x")
 
 
 def test_free_is_highlighted():

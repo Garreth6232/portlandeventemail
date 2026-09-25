@@ -41,17 +41,23 @@ radius_miles = 15
 today = 8
 this_week = 12
 coming_up = 12
-# No more than this many from one category in a section, so each one shows
-# a spread. Leftover seats are filled from whatever's next best.
-max_per_category = 3
+# No more than this many from one category, or from one venue, in a
+# section, so each one shows a spread. Leftover seats are filled from
+# whatever's next best.
+max_per_category = 2
+max_per_venue = 2
 # Arena and big-hall listings allowed per section.
-max_big_venue = 2
+max_big_venue = 1
 
 [categories]
 # 1.0 is neutral. Anything not listed here counts as 1.0.
-"film" = 1.5
+# Film and music sit at neutral on purpose: there's a lot of both, so an
+# ordinary screening or concert shouldn't outrank everything else. The
+# special ones (a 35mm print, a Q&A, a live score, a one-night show) get
+# there through the keyword boosts below and the penalty for long runs.
+"film" = 1.0
 "food & drink" = 1.4
-"music" = 1.2
+"music" = 1.0
 "comedy" = 1.1
 "theater & arts" = 1.1
 "talks & readings" = 1.1
@@ -68,7 +74,7 @@ max_big_venue = 2
 [boosts]
 # Added to an event's score when its name or venue contains the word.
 # Only the largest matching boost counts, so they don't stack.
-keywords = { "wine" = 0.5, "winery" = 0.4, "natural wine" = 0.5, "pop-up" = 0.3, "35mm" = 0.5, "70mm" = 0.5, "16mm" = 0.4, "double feature" = 0.3, "retrospective" = 0.3, "q&a" = 0.3, "premiere" = 0.2, "screening" = 0.2, "outdoor movie" = 0.3 }
+keywords = { "wine" = 0.5, "winery" = 0.4, "natural wine" = 0.5, "pop-up" = 0.3, "35mm" = 0.5, "70mm" = 0.5, "16mm" = 0.4, "double feature" = 0.3, "retrospective" = 0.3, "q&a" = 0.3, "premiere" = 0.2, "screening" = 0.2, "outdoor movie" = 0.3, "anniversary" = 0.3, "restoration" = 0.3, "live score" = 0.4, "in person" = 0.3, "in conversation" = 0.3, "album release" = 0.3, "one night only" = 0.3 }
 
 # Venues we like. Anything here gets venue_boost on top of the above.
 favorite_venues = [
@@ -82,6 +88,29 @@ favorite_venues = [
   "5th Avenue Cinema",
 ]
 venue_boost = 0.4
+
+# Anything with this many dates or more in the next month (a film's regular
+# run, a play's month-long run, weekly trivia) loses this much, so one-off
+# events rank above things you could catch any day.
+long_run = 5
+long_run_penalty = 0.5
+
+[top_pick]
+# Each section's "Top pick" takes turns through these categories, one step
+# a day, with each section starting at a different point so an email's
+# picks differ. A section with nothing in that day's category uses the
+# next one down the list.
+rotation = [
+  "Food & Drink",
+  "Music",
+  "Theater & Arts",
+  "Film",
+  "Comedy",
+  "Talks & Readings",
+  "Festival",
+  "Parks",
+  "Market",
+]
 
 [ticketed]
 # Ticketmaster and SeatGeek list nearly everything with a box office, so
