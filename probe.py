@@ -15,6 +15,8 @@ from __future__ import annotations
 import json
 import os
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from urllib import robotparser
 from urllib.parse import urljoin, urlparse
@@ -26,8 +28,21 @@ from bs4 import BeautifulSoup
 import net
 from sources.events_calendar import PATH as EVENTS_CALENDAR_PATH
 
-TIMEOUT = 20
+TIMEOUT = 15
 BOT_NAME = "PortlandEventsDigest"
+PARALLEL = 8
+
+_local = threading.local()
+
+
+def session() -> requests.Session:
+    """Same headers as the digest's requests, but no retries: a probe
+    should report a slow or failing site, not wait it out."""
+    if not hasattr(_local, "session"):
+        s = requests.Session()
+        s.headers.update(net.session().headers)
+        _local.session = s
+    return _local.session
 
 
 @dataclass(frozen=True)
@@ -77,7 +92,7 @@ class Result:
 def robots_for(site: str) -> robotparser.RobotFileParser | None:
     parser = robotparser.RobotFileParser()
     try:
-        resp = net.session().get(urljoin(site, "/robots.txt"), timeout=TIMEOUT)
+        resp = session().get(urljoin(site, "/robots.txt"), timeout=TIMEOUT)
     except requests.RequestException:
         return None
     if resp.status_code >= 400:
@@ -159,7 +174,7 @@ def probe(candidate: Candidate) -> list[Result]:
             results.append(Result(candidate.name, url, "robots.txt says no", "skipped"))
             continue
         try:
-            resp = net.session().get(url, timeout=TIMEOUT)
+            resp = session().get(url, timeout=TIMEOUT)
         except requests.RequestException as exc:
             results.append(Result(candidate.name, url, "unreachable", type(exc).__name__))
             continue
@@ -169,7 +184,8 @@ def probe(candidate: Candidate) -> list[Result]:
 
 
 def main() -> int:
-    rows = [r for c in CANDIDATES for r in probe(c)]
+    with ThreadPoolExecutor(max_workers=PARALLEL) as pool:
+        rows = [r for results in pool.map(probe, CANDIDATES) for r in results]
     table = ["| Source | URL | Status | What's there |", "| --- | --- | --- | --- |"]
     table += [f"| {r.name} | {r.url} | {r.status} | {r.found.replace('|', '/')} |" for r in rows]
     report = "\n".join(table) + "\n"
