@@ -60,30 +60,48 @@ log = logging.getLogger(__name__)
 
 
 def fetch(settings: Settings, window: Window) -> list[Event]:
+    """Read both roundups. They can sit on different feed pages (by
+    Thursday the weekend one is up top and the weekday one may have slid to
+    page two), so keep looking until both turn up or the pages run out."""
+    found: dict[str, object] = {}
     for page in range(1, FEED_PAGES + 1):
         if page > 1:
             time.sleep(CRAWL_DELAY)
         params = {"paged": page} if page > 1 else None
-        roundups = find_roundups(net.get(FEED_URL, params=params).content)
-        if roundups:
-            events = []
-            for roundup in roundups:
-                content = roundup.content[0].value if roundup.get("content") else roundup.get("summary", "")
-                events.extend(parse_roundup(content, window.today, window.tz))
-            return events
+        try:
+            feed_xml = net.get(FEED_URL, params=params).content
+        except Exception as exc:
+            if page == 1:
+                raise
+            log.warning("PDX Pipeline: couldn't read feed page %d (%s)", page, exc)
+            break
+        for roundup in find_roundups(feed_xml):
+            found.setdefault(_path(roundup.get("link", "")), roundup)
+        if len(found) == len(ROUNDUP_PATHS):
+            break
 
-    log.warning("PDX Pipeline: no weekly or weekend roundup in the feed")
-    return []
+    if not found:
+        log.warning("PDX Pipeline: no weekly or weekend roundup in the feed")
+    events = []
+    for roundup in found.values():
+        content = roundup.content[0].value if roundup.get("content") else roundup.get("summary", "")
+        events.extend(parse_roundup(content, window.today, window.tz, roundup.get("link") or WEEK_URL))
+    return events
+
+
+def _path(link: str) -> str:
+    return urlparse(link).path.rstrip("/")
 
 
 def find_roundups(feed_xml: bytes) -> list:
     """The weekday and weekend roundup entries in one page of the feed."""
     feed = feedparser.parse(feed_xml)
-    return [e for e in feed.entries
-            if urlparse(e.get("link", "")).path.rstrip("/") in ROUNDUP_PATHS]
+    return [e for e in feed.entries if _path(e.get("link", "")) in ROUNDUP_PATHS]
 
 
-def parse_roundup(html: str, today: date, tz) -> list[Event]:
+def parse_roundup(html: str, today: date, tz, url: str = WEEK_URL) -> list[Event]:
+    """Events in one roundup. `url` is the roundup itself, used as the link
+    for any line that doesn't carry its own."""
     soup = BeautifulSoup(html, "html.parser")
     events: list[Event] = []
     current: Optional[date] = None
@@ -94,7 +112,7 @@ def parse_roundup(html: str, today: date, tz) -> list[Event]:
             continue
         if current is None:
             continue
-        event = _parse_line(el, current, tz)
+        event = _parse_line(el, current, tz, url)
         if event:
             events.append(event)
 
@@ -114,7 +132,7 @@ def _header_date(text: str, today: date) -> Optional[date]:
     return candidate
 
 
-def _parse_line(li, day: date, tz) -> Optional[Event]:
+def _parse_line(li, day: date, tz, roundup_url: str) -> Optional[Event]:
     match = _LINE.match(li.get_text(" ", strip=True))
     if not match:
         return None
@@ -127,7 +145,7 @@ def _parse_line(li, day: date, tz) -> Optional[Event]:
         name=match["name"].strip(),
         start=start,
         venue=match["venue"].strip(),
-        url=link["href"] if link else WEEK_URL,
+        url=link["href"] if link else roundup_url,
         source=KEY,
         category=canonical(match["category"]),
         price="Free" if _FREE.search(match["desc"]) else None,

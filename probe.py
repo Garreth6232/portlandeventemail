@@ -17,6 +17,7 @@ import os
 import re
 import sys
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from urllib import robotparser
@@ -188,8 +189,12 @@ def probe(candidate: Candidate) -> list[Result]:
     if not candidate.feed:
         urls.append(urljoin(candidate.site, EVENTS_CALENDAR_PATH))
 
+    # Sites like PDX Pipeline ask for a pause between requests.
+    delay = robots.crawl_delay(BOT_NAME) if robots else None
     results = []
     for url in urls:
+        if delay:
+            time.sleep(float(delay))
         if not allowed(robots, url):
             results.append(Result(candidate.name, url, "robots.txt says no", "skipped"))
             continue
