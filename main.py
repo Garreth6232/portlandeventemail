@@ -1,6 +1,6 @@
 """Build and send the Portland events digest.
 
-    python main.py                  scheduled run: sends on weekday mornings, once a day
+    python main.py                  scheduled run: sends every morning, once a day
     python main.py --force          send now
     python main.py --dry-run        write preview.html and preview.txt instead of sending
     python main.py --only-me        send now, but only to the Gmail address it sends from
@@ -31,14 +31,14 @@ log = logging.getLogger("digest")
 
 
 def should_send(now: datetime, tz: ZoneInfo, send_from: time, send_until: time) -> bool:
-    """Whether a scheduled run at `now` falls in the weekday send window.
+    """Whether a scheduled run at `now` falls in the morning send window.
 
     GitHub starts scheduled jobs late, often by hours on busy mornings, so
     the workflow tries every half hour and this decides by the actual
     clock. The workflow separately skips runs once the day's email is out.
     """
     local = now.astimezone(tz)
-    return local.weekday() < 5 and send_from <= local.time() < send_until
+    return send_from <= local.time() < send_until
 
 
 def _mark_sent() -> None:
@@ -98,7 +98,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     prefs = settings.prefs
     forecast = weather.fetch(prefs.latitude, prefs.longitude, digest.window.today, settings.timezone.key)
     weather_line = forecast.line if forecast else None
-    subject = render.subject(digest, prefs.subject_lines or render.DEFAULT_SUBJECTS, prefs.subject_by_day)
+    subject = render.subject(digest.window.today, forecast.summary if forecast else None,
+                             prefs.subject, prefs.subject_no_weather)
     condition = forecast.condition if forecast else None
     if args.weather:
         condition = args.weather

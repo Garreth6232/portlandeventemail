@@ -7,7 +7,7 @@ on:
     # off the hour. main.py sends from the first run that starts at 7:45am
     # or later, and the cache check below makes every later run that day
     # skip. Times are UTC and cover both daylight and standard time.
-    - cron: "7,37 10-19 * * 1-5"
+    - cron: "7,37 10-19 * * *"
   workflow_dispatch:
     inputs:
       force:

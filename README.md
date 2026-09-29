@@ -1,6 +1,6 @@
 # Portland Events
 
-A weekday-morning email of things to do around Portland, sent at 8am to a
+A daily morning email of things to do around Portland, sent at 8am to a
 short list of people. It leans toward repertory film, wine bars, small shows
 and park events, with the occasional big arena night mixed in.
 
@@ -99,7 +99,7 @@ from ticketing sites and start within half an hour of each other.
 5. **Send a test.** Actions > Send digest > Run workflow, with "Send now"
    checked.
 
-After that it sends every weekday around 8am. To see the email without sending
+After that it sends every morning around 8am, weekends included. To see the email without sending
 it to anyone, run the workflow with "Preview only" checked; the finished
 email is attached to the run as a download called `preview`.
 
@@ -108,12 +108,11 @@ is nowhere near the limit.
 
 ## Changing what shows up
 
-The subject line names the day's top pick, like "Hump day pick: Batman
-in 70mm". Each weekday has its own few lines under `[subject]` in
-`preferences.toml`, taking turns week to week. `{pick}` becomes the top
-pick, `{more}` the number of other listings, `{date}` "Tuesday, Sep 22"
-and `{weekday}` "Tuesday". On a day with no top pick, one of the general
-`lines` goes out instead.
+The subject line is the day's weather: "Portland Today | High 69°, partly
+cloudy". The template lives under `[subject]` in `preferences.toml`:
+`{weather}` becomes the day's high and sky, `{date}` "Tuesday, Sep 22" and
+`{weekday}` "Tuesday". If the forecast can't be reached, `no_weather` goes
+out instead ("Portland Today | Tuesday, Sep 22").
 
 Everything about taste lives in `preferences.toml`: category weights,
 keyword boosts ("35mm", "natural wine"), favorite venues, which venues
@@ -221,8 +220,8 @@ GitHub starts scheduled jobs late, often by three or four hours, and runs
 set for the top of the hour are the worst hit. A single 8am run therefore
 tends to arrive around lunchtime. So the workflow tries every half hour
 from about 3am to noon Pacific, at :07 and :37 past the hour, and
-`main.py` sends from the first run that starts between 7:45am and noon on
-a weekday. Once that run sends, it leaves a marker in the Actions cache
+`main.py` sends from the first run that starts between 7:45am and noon,
+any day of the week. Once that run sends, it leaves a marker in the Actions cache
 for the day, and every later run that day sees it and stops. If GitHub's delay
 holds steady through the morning, the email lands between 7:45 and 8:15, and the retries cover GitHub skipping
 a run.
@@ -230,7 +229,7 @@ a run.
 Change the window with `SEND_FROM` and `SEND_UNTIL` in `config.py`.
 
 Each check that doesn't send still costs a billed minute on a private
-repo, about 20 a weekday or 450 a month. The free plan includes 2,000.
+repo, about 20 a day or 600 a month. The free plan includes 2,000.
 
 A manual run with "Send now" also marks the day as sent, so the morning
 runs won't send it again. "Only me" and "Preview only" don't.

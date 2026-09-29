@@ -23,6 +23,7 @@ def day(codes, rain=0, temps=60.0, wind=3.0, gust=8.0):
 def test_real_forecast_reads_as_three_parts():
     f = weather.parse(REAL_DAY)
     assert f.line == "Morning 61°, cloudy · Afternoon 69°, partly cloudy · Tonight 63°, mostly clear"
+    assert f.summary.startswith("High 69°, ")
     # A mix of cloud and sun with nothing else going on counts as a normal day.
     assert f.condition == weather.NORMAL
 
@@ -58,6 +59,7 @@ def test_rain_shows_with_its_chance():
     f = weather.parse(day(63, rain=80))
     assert f.condition == weather.RAINY
     assert "Afternoon 60°, rain (80%)" in f.line
+    assert f.summary == "High 60°, rain (80%)"
 
 
 def test_rain_chance_mentioned_even_when_sky_is_just_cloudy():

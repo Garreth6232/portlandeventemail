@@ -1,11 +1,9 @@
 """Turns a Digest into a subject line, an HTML body, and a plain-text body."""
 from __future__ import annotations
 
-import re
 from datetime import date, datetime
 from itertools import groupby
 from pathlib import Path
-from typing import Mapping, Sequence
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -30,28 +28,12 @@ _MORE_TITLES = {"today": "Also today", "week": "Also this week", "later": "Also 
 HTML_BUDGET = 95_000
 PREVIEW_NAME_LIMIT = 40
 
-# Subject lines. Each weekday has its own set, taking turns week to week,
-# so this Monday's line isn't last Monday's. {pick} is the top pick in the
-# first section; a line that uses it is skipped on a day with no pick, and
-# one of the general lines is used instead. Override under [subject] in
-# preferences.toml.
-DEFAULT_SUBJECTS = (
-    "Good morning, Portland! {date}",
-    "What's on in Portland, {date}",
-    "Coffee's on. Here's Portland for {date}",
-)
-DEFAULT_DAY_SUBJECTS: dict[str, tuple[str, ...]] = {
-    "monday": ("New week, new plans: {pick}",),
-    "tuesday": ("Tuesday's move: {pick}",),
-    "wednesday": ("Hump day pick: {pick}",),
-    "thursday": ("Thursday is basically Friday: {pick}",),
-    "friday": ("Weekend loading: {pick} and {more} more",),
-}
-SUBJECT_PICK_LIMIT = 45  # characters of the pick's name before it's clipped
-# Event titles go straight into people's inboxes via {pick}. One with any of
-# these words is left out of the subject (it still appears in the email).
-_NOT_FOR_SUBJECTS = re.compile(
-    r"\b(shit\w*|fuck\w*|bitch\w*|cunt\w*|dick\w*|cock\w*|pussy|asshole\w*|damn\w*)\b", re.IGNORECASE)
+# The subject line: "Portland Today | High 69°, partly cloudy". {weather} is
+# the day's forecast in a few words; when the forecast can't be reached the
+# second template goes out instead. Override under [subject] in
+# preferences.toml. Both can use {date} "Tuesday, Sep 22" and {weekday}.
+DEFAULT_SUBJECT = "Portland Today | {weather}"
+DEFAULT_SUBJECT_NO_WEATHER = "Portland Today | {date}"
 
 # Category labels are colored so a glance down the list shows the mix.
 # All of these clear WCAG AA contrast on white.
@@ -237,31 +219,12 @@ def _context(digest: Digest, from_name: str, weather_line: str | None = None,
 
 # Output ---------------------------------------------------------------------
 
-def subject(digest: Digest, lines: Sequence[str] = DEFAULT_SUBJECTS,
-            by_day: Mapping[str, Sequence[str] | str] | None = None) -> str:
-    today = digest.window.today
-    by_day = DEFAULT_DAY_SUBJECTS if by_day is None else by_day
-    # The first section's pick, or the next one if its name isn't fit for a
-    # subject line.
-    pick = next((s.pick for s in digest.sections
-                 if s.pick and not _NOT_FOR_SUBJECTS.search(s.pick.name)), None)
-
-    day_lines = by_day.get(f"{today:%A}".lower()) or ()
-    if isinstance(day_lines, str):
-        day_lines = (day_lines,)
-    usable = [t for t in day_lines if pick or "{pick}" not in t]
-    if usable:
-        # Same weekday, next week: the next line in that day's set.
-        template = usable[(today.toordinal() // 7) % len(usable)]
-    else:
-        general = [t for t in lines if pick or "{pick}" not in t] or list(DEFAULT_SUBJECTS)
-        template = general[today.toordinal() % len(general)]
-
-    return template.format(
+def subject(today: date, weather: str | None, template: str = DEFAULT_SUBJECT,
+            no_weather: str = DEFAULT_SUBJECT_NO_WEATHER) -> str:
+    return (template if weather else no_weather).format(
         date=f"{today:%A}, {today:%b} {today.day}",
         weekday=f"{today:%A}",
-        pick=_clip(pick.name, SUBJECT_PICK_LIMIT) if pick else "",
-        more=max(digest.total - 1, 0),
+        weather=weather or "",
     )
 
 
