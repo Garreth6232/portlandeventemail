@@ -114,6 +114,10 @@ cloudy". The template lives under `[subject]` in `preferences.toml`:
 `{weekday}` "Tuesday". If the forecast can't be reached, `no_weather` goes
 out instead ("Portland Today | Tuesday, Sep 22").
 
+Under the date sits a short quote, a new one each day. They live in
+`quotes.py`; add or remove lines there. Every quote comes up once before
+any repeats.
+
 Everything about taste lives in `preferences.toml`: category weights,
 keyword boosts ("35mm", "natural wine"), favorite venues, which venues
 Ticketmaster and SeatGeek can list from, the calendar sites, section sizes

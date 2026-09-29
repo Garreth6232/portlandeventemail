@@ -8,6 +8,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 import categories as cat
+import quotes
 from mailer.banners import DISPLAY_WIDTH
 from models import Event
 from pipeline import Digest, Section
@@ -209,6 +210,7 @@ def _context(digest: Digest, from_name: str, weather_line: str | None = None,
         "from_name": from_name,
         "date_line": long_day(digest.window.today),
         "weather": weather_line,
+        "quote": quotes.for_day(digest.window.today),
         "summary": join(counts),
         "preheader": _preheader(digest),
         "sections": sections,
@@ -257,7 +259,8 @@ def text(digest: Digest, from_name: str, weather_line: str | None = None) -> str
     lines = [ctx["from_name"], ctx["date_line"]]
     if ctx["weather"]:
         lines.append(ctx["weather"])
-    lines.append("")
+    quote, who = ctx["quote"]
+    lines += ["", f'"{quote}"', who, ""]
 
     for section in ctx["sections"]:
         lines += [f"{section['title'].upper()}  {section['span']}".rstrip(), ""]
