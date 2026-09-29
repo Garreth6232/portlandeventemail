@@ -38,18 +38,18 @@ def test_nothing_after_noon():
     assert not sends(utc(2026, 12, 1, 20, 7))    # 12:07pm PST
 
 
-def test_weekends_never_send():
-    assert not sends(utc(2026, 9, 26, 15))  # Saturday 8am PDT
-    assert not sends(utc(2026, 9, 27, 15))  # Sunday
+def test_weekends_send_too():
+    assert sends(utc(2026, 9, 26, 15))  # Saturday 8am PDT
+    assert sends(utc(2026, 9, 27, 15))  # Sunday
 
 
-def test_every_scheduled_run_falls_on_the_same_pacific_weekday():
-    # The cron runs 10:07 to 19:37 UTC, Monday to Friday. All of those are
-    # the same weekday in Portland, winter or summer.
+def test_every_scheduled_run_falls_on_the_same_pacific_day():
+    # The cron runs 10:07 to 19:37 UTC every day. All of those are the same
+    # date in Portland, winter or summer, so one day's runs share a marker.
     for day in ((2026, 9, 21), (2026, 12, 7)):
         for hour in (10, 19):
             moment = utc(*day, hour, 37)
-            assert moment.astimezone(TIMEZONE).weekday() == moment.weekday()
+            assert moment.astimezone(TIMEZONE).date() == moment.date()
 
 
 def test_already_sent_skips_before_building(monkeypatch):

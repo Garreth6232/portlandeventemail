@@ -41,8 +41,8 @@ class Preferences:
     small_venues: tuple[str, ...]
     parks_only: tuple[str, ...]
     calendars: tuple[Calendar, ...] = ()
-    subject_lines: tuple[str, ...] = ()
-    subject_by_day: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    subject: str = "Portland Today | {weather}"
+    subject_no_weather: str = "Portland Today | {date}"
     headers: dict[str, tuple[str, ...]] = field(default_factory=dict)
     movie_theaters: tuple[str, ...] = ()
     top_pick_rotation: tuple[str, ...] = ()
@@ -97,12 +97,8 @@ def load_preferences(path: Path = PREFERENCES_PATH) -> Preferences:
         small_venues=tuple(ticketed.get("small_venues", [])),
         parks_only=tuple(p.lower() for p in raw.get("parks", {}).get("only", [])),
         calendars=tuple(_calendar(c) for c in raw.get("calendars", [])),
-        subject_lines=tuple(raw.get("subject", {}).get("lines", [])),
-        subject_by_day={
-            day: (lines,) if isinstance(lines, str) else tuple(lines)
-            for day, lines in raw.get("subject", {}).items()
-            if day in _WEEKDAYS
-        },
+        subject=raw.get("subject", {}).get("line", Preferences.subject),
+        subject_no_weather=raw.get("subject", {}).get("no_weather", Preferences.subject_no_weather),
         headers={
             weather.lower(): tuple([files] if isinstance(files, str) else files)
             for weather, files in raw.get("headers", {}).items()
@@ -120,9 +116,6 @@ def load_preferences(path: Path = PREFERENCES_PATH) -> Preferences:
 def _clock(value) -> Optional[time]:
     """"17:00" as a time; None when unset."""
     return time.fromisoformat(value) if value else None
-
-
-_WEEKDAYS = {"monday", "tuesday", "wednesday", "thursday", "friday"}
 
 
 def _calendar(raw: dict) -> Calendar:

@@ -1,5 +1,6 @@
 """Today's weather in three parts (morning, afternoon, tonight) for the line
-under the date, plus one word for the whole day that picks the header image.
+under the date, a short one for the subject line, and one word for the whole
+day that picks the header image.
 
 Forecast from Open-Meteo: free, no key, hourly data in local time.
 https://open-meteo.com/en/docs
@@ -26,6 +27,9 @@ PERIODS = (
     ("Afternoon", 12, 17, "high"),
     ("Tonight", 18, 22, "average"),
 )
+# The subject line's summary: the day's high, and the sky while it's light.
+DAYTIME = (7, 22)
+DAYLIGHT = (7, 17)
 
 # The day's one-word condition, which picks the header (see [headers] in
 # preferences.toml). Checked in this order; the first that fits wins.
@@ -84,10 +88,16 @@ class Period:
 class Forecast:
     periods: tuple[Period, ...]
     condition: str
+    day: Optional[Period] = None
 
     @property
     def line(self) -> str:
         return " · ".join(str(p) for p in self.periods)
+
+    @property
+    def summary(self) -> str:
+        """The whole day in a few words, e.g. "High 69°, partly cloudy"."""
+        return str(self.day) if self.day else str(self.periods[0])
 
 
 def fetch(latitude: float, longitude: float, day: date, timezone: str) -> Optional[Forecast]:
@@ -142,8 +152,16 @@ def parse(data: dict) -> Optional[Forecast]:
         ))
     if not periods:
         return None
-    daytime = [hours[h] for h in range(7, 23) if h in hours]
-    return Forecast(tuple(periods), _condition(daytime))
+    daytime = [hours[h] for h in range(DAYTIME[0], DAYTIME[1] + 1) if h in hours]
+    daylight = [hours[h] for h in range(DAYLIGHT[0], DAYLIGHT[1] + 1) if h in hours] or daytime
+    whole_day = Period(
+        label="High",
+        temp=round(max(r.temp for r in daytime)),
+        sky=_describe([r.code for r in daylight], night=False),
+        rain_chance=max(r.rain for r in daytime),
+        windy=sum(r.windy for r in daytime) >= 2,
+    ) if daytime else None
+    return Forecast(tuple(periods), _condition(daytime), whole_day)
 
 
 def _describe(codes: list[int], night: bool) -> str:

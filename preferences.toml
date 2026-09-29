@@ -2,48 +2,13 @@
 # Edit, commit, and the next morning's email picks it up.
 
 [subject]
-# The email's subject line. Each weekday has its own set below, and they
-# take turns week to week, so one Monday's line isn't the next's.
-#   {pick}     the top pick's name (the first section's), e.g. "Batman in 70mm"
-#   {more}     how many other listings are in the email
+# The email's subject line, e.g. "Portland Today | High 69°, partly cloudy".
+#   {weather}  the day's high and sky, e.g. "High 69°, partly cloudy"
 #   {date}     "Tuesday, Sep 22"
 #   {weekday}  "Tuesday"
-# A line with {pick} is skipped on a day with no top pick; one of the
-# general lines at the bottom goes out instead.
-monday = [
-  "New week, new plans: {pick}",
-  "Monday, handled: {pick}",
-  "Mondays are better with {pick}",
-  "Start the week right: {pick} + {more} more",
-]
-tuesday = [
-  "Tuesday's move: {pick}",
-  "Nothing happens on Tuesdays? Wrong: {pick}",
-  "Skip the couch tonight: {pick}",
-]
-wednesday = [
-  "Hump day pick: {pick}",
-  "Halfway there. Treat yourself: {pick}",
-  "Midweek, Portland style: {pick}",
-]
-thursday = [
-  "Thursday is basically Friday: {pick}",
-  "Get a head start on the weekend: {pick}",
-  "Almost Friday: {pick} + {more} more",
-]
-friday = [
-  "Weekend loading: {pick} and {more} more",
-  "Your Portland weekend starts with {pick}",
-  "Friday! Plans, sorted: {pick}",
-  "The weekend's here: {pick} + {more} more",
-]
-# For days with no top pick.
-lines = [
-  "Good morning, Portland! {date}",
-  "What's on in Portland, {date}",
-  "Coffee's on. Here's Portland for {date}",
-  "Portland, {weekday} edition",
-]
+line = "Portland Today | {weather}"
+# Used instead when the forecast can't be reached.
+no_weather = "Portland Today | {date}"
 
 [headers]
 # Which header image goes out for each kind of weather. Files live in assets/.
