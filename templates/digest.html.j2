@@ -51,6 +51,15 @@
           </td>
         </tr>
 
+{% if quote %}
+        <tr>
+          <td style="padding-top:22px;">
+            <div style="font-family:{{ serif }}; font-size:14px; line-height:1.5; font-style:italic; color:{{ muted }};">&ldquo;{{ quote[0] }}&rdquo;</div>
+            <div style="font-family:{{ sans }}; font-size:12px; line-height:1.5; color:{{ faint }}; padding-top:2px;">{{ quote[1] }}</div>
+          </td>
+        </tr>
+{% endif %}
+
 {% if not sections %}
         <tr>
           <td style="font-family:{{ sans }}; font-size:16px; line-height:1.6; color:#3a3a3a; padding-top:28px;">Nothing new on the calendar. Back tomorrow.</td>
